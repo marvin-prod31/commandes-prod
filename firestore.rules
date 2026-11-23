@@ -29,8 +29,7 @@ service cloud.firestore {
     match /commandes/{id} {
       // Prod Colomiers (m1) voit aussi les commandes des autres magasins.
       allow read: if isCentrale() || role() == 'm1' || (role() != '' && resource.data.magasin == role())
-                  // Questions entre magasins : tous les magasins voient les questions en cours,
-                  // et le magasin qui a dit « oui » voit la commande qu'il doit envoyer.
+                  // Anciennes questions entre magasins, et commandes envoyées à un autre magasin.
                   || (role() != '' && resource.data.statut == 'demande')
                   || (role() != '' && resource.data.fournisseurMagasin == role());
       allow create: if isCentrale() || (role() != '' && request.resource.data.magasin == role() && request.resource.data.statut in ['envoyee', 'demande']);
@@ -46,6 +45,11 @@ service cloud.firestore {
                     || (role() != '' && resource.data.statut == 'demande'
                         && request.resource.data.magasin == resource.data.magasin
                         && request.resource.data.statut in ['demande', 'commandee', 'envoyee'])
+                    // Commande envoyée à un autre magasin (menu « Envoyer à ») : ce magasin la marque envoyée,
+                    // ou la passe à la centrale s'il ne l'a pas.
+                    || (role() != '' && resource.data.fournisseurMagasin == role() && resource.data.statut == 'envoyee'
+                        && request.resource.data.magasin == resource.data.magasin
+                        && request.resource.data.statut in ['envoyee', 'commandee'])
                     // Article fourni par un autre magasin : le magasin demandeur le marque reçu.
                     || (role() != '' && resource.data.magasin == role() && resource.data.statut == 'commandee'
                         && resource.data.fournisseurMagasin is string

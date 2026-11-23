@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261123144521"></script>
+<script src="config.js?v=20261123150005"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -204,30 +204,16 @@ details summary { cursor: pointer; font-weight: 600; }
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const fmtDay = (ymd) => { const m = String(ymd).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + "/" + m[2] + "/" + m[1] : String(ymd); };
   const RETARD_JOURS = 7;
-  const DELAI_QUESTION_H = 48; // délai total avant l'envoi à la centrale
-  // Ordre dans lequel chaque magasin interroge les autres (demande de Marvin, 23/11).
-  const ORDRE = { m1: ["m2", "m3", "m4"], m2: ["m1", "m3", "m4"], m3: ["m1", "m2", "m4"], m4: ["m1", "m2", "m3"] };
-  const TOUR_H = DELAI_QUESTION_H / 3; // temps laissé à chaque magasin pour répondre
   const STAT_KEYS = ["envoyee", "commandee", "recue", "manquant"];
   const ageJours = (c) => { const d = c.dateCommande ? new Date(c.dateCommande + "T00:00:00") : new Date(c.creeLe); const t = new Date(); t.setHours(0, 0, 0, 0); d.setHours(0, 0, 0, 0); return Math.round((t - d) / 86400000); };
-  const enRetard = (c) => c.statut === "envoyee" && ageJours(c) >= RETARD_JOURS;
+  const enRetard = (c) => c.statut === "envoyee" && !c.fournisseurMagasin && ageJours(c) >= RETARD_JOURS;
   const refKey = (r) => norm(r).toUpperCase().replace(/[^A-Z0-9_\-.~:@+]/g, "_").slice(0, 150);
   const clientNom = (c) => { const n = [c.prenom, c.client].map(norm).filter(Boolean).join(" "), pro = norm(c.professionnel); return n && pro ? n + " (" + pro + ")" : n || pro || "Client"; };
   const pool = () => { const m = new Map(); [...state.commandes, ...state.demandes, ...state.aEnvoyer].forEach((c) => m.set(c.id, c)); return [...m.values()]; };
   const autres = (m) => MAGS.filter((x) => x !== m);
-  const cibleDe = (c) => c.questionA || ORDRE[c.magasin][0];
-  const demandesPour = (m) => pool().filter((c) => c.statut === "demande" && cibleDe(c) === m);
-  const finTour = (c) => new Date(c.questionLe || c.demandeLe || c.creeLe).getTime() + TOUR_H * 3600000;
-  // Passe la question au magasin suivant, ou à la centrale s'il n'y en a plus.
-  async function suivant(c, reponse) {
-    const now = new Date().toISOString();
-    const ordre = ORDRE[c.magasin], cible = cibleDe(c);
-    const next = ordre[ordre.indexOf(cible) + 1];
-    const rep = { ["rep_" + cible]: reponse };
-    if (next) await state.db.collection("commandes").doc(c.id).update({ ...rep, questionA: next, questionLe: now });
-    else await changeStatus(c, "envoyee", { ...rep, vuParMagasin: false, noteCentrale: "Aucun magasin ne l'avait : envoyée à la centrale." });
-  }
-  const aEnvoyerPar = (m) => pool().filter((c) => c.fournisseurMagasin === m && c.statut === "commandee");
+  // Commande adressée à un autre magasin (menu « Envoyer à », demande de Marvin 23/11) : champ fournisseurMagasin.
+  const aTraiterPar = (m) => pool().filter((c) => c.fournisseurMagasin === m && c.magasin !== m && c.statut === "envoyee");
+  const pourCentrale = (c) => !c.fournisseurMagasin;
   const estManquant = (c) => c.statut === "manquant" || (c.alerteManquant && c.statut === "envoyee");
   const shortId = (id) => id.slice(0, 6).toUpperCase();
   const nom = (m) => state.noms[m] || DEFAULT_NOMS[m] || m;
@@ -273,7 +259,6 @@ details summary { cursor: pointer; font-weight: 600; }
     if (state.route !== "centrale" && !VOIT_TOUT.includes(state.route)) q = q.where("magasin", "==", state.route);
     if (state.route !== "centrale" && !VOIT_TOUT.includes(state.route)) {
       const col = state.db.collection("commandes");
-      unsubs.push(col.where("statut", "==", "demande").onSnapshot((snap) => { state.demandes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, (e) => console.error(e)));
       unsubs.push(col.where("fournisseurMagasin", "==", state.route).onSnapshot((snap) => { state.aEnvoyer = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, (e) => console.error(e)));
     }
     unsubs.push(q.onSnapshot((snap) => {
@@ -281,7 +266,7 @@ details summary { cursor: pointer; font-weight: 600; }
       state.commandes.sort((a, b) => String(b.creeLe).localeCompare(String(a.creeLe)));
       state.loaded = true;
       if (!snap.metadata.fromCache) { state.failed = ""; clearTimeout(timer); }
-      render(); autoEscalate();
+      render();
     }, (e) => { clearTimeout(timer); state.failed = "Impossible de lire les commandes (" + e.code + ")."; render(); }));
   }
 
@@ -290,20 +275,6 @@ details summary { cursor: pointer; font-weight: 600; }
     const historique = [...(Array.isArray(c.historique) ? c.historique : []), { statut, le: now }];
     await state.db.collection("commandes").doc(c.id).update({ statut, majLe: now, vuParMagasin: false, clientPrevenu: false, historique, ...(statut === "commandee" || statut === "recue" ? { alerteManquant: false } : {}), ...extra });
   }
-  // Question sans « oui » : tous ont dit non, ou délai dépassé -> part à la centrale.
-  const escalating = new Set();
-  function autoEscalate() {
-    if (!state.db || state.readonly) return;
-    const now = Date.now();
-    for (const c of pool()) {
-      if (c.statut !== "demande" || escalating.has(c.id)) continue;
-      if (state.route !== "centrale" && c.magasin !== state.route) continue;
-      if (now <= finTour(c)) continue;
-      escalating.add(c.id);
-      suivant(c, "sans réponse").catch((e) => console.error(e)).finally(() => escalating.delete(c.id));
-    }
-  }
-  setInterval(autoEscalate, 5 * 60000);
   async function revert(c) {
     const h = Array.isArray(c.historique) ? c.historique.slice(0, -1) : [];
     if (!h.length) return;
@@ -321,16 +292,16 @@ details summary { cursor: pointer; font-weight: 600; }
   const vues = new Set(); let premierPassage = true;
   function notifierQuestions() {
     const r = state.route; if (!r || r === "centrale" || r === "inconnu" || !state.loaded) return;
-    const qs = demandesPour(r);
+    const qs = aTraiterPar(r);
     try { document.title = (qs.length ? "(" + qs.length + ") " : "") + "Commandes magasins"; } catch {}
     const nouvelles = qs.filter((c) => !vues.has(c.id));
     nouvelles.forEach((c) => vues.add(c.id));
     if (premierPassage) { premierPassage = false; if (!nouvelles.length) return; }
     if (!nouvelles.length) return;
     const c = nouvelles[0];
-    const txt = nom(c.magasin) + " vous demande : " + c.produit + " (" + c.reference + ")";
+    const txt = nom(c.magasin) + " vous commande : " + c.produit + (c.reference ? " (" + c.reference + ")" : "");
     toast("🔔 " + txt);
-    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Question d'un magasin", { body: txt }); } catch {}
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Commande d'un magasin", { body: txt }); } catch {}
   }
   function render() {
     notifierQuestions();
@@ -402,7 +373,8 @@ details summary { cursor: pointer; font-weight: 600; }
   function pill(st, c) {
     let l = (ST[st] || {}).l || st;
     if (c && c.alerteManquant && st === "envoyee") { return `<span class="pill p-manquant">Manquant · remis à commander</span>`; }
-    if (c && c.fournisseurMagasin && st === "commandee") l = "Disponible chez " + nom(c.fournisseurMagasin);
+    if (c && c.fournisseurMagasin && st === "envoyee") l = "Envoyée à " + nom(c.fournisseurMagasin);
+    if (c && c.fournisseurMagasin && st === "commandee") l = "Envoyé par " + nom(c.fournisseurMagasin);
     if (c && c.fournisseurMagasin && st === "recue") l = "Reçue de " + nom(c.fournisseurMagasin);
     return `<span class="pill p-${st}">${esc(l)}</span>`;
   }
@@ -422,7 +394,6 @@ details summary { cursor: pointer; font-weight: 600; }
     const ro = state.readonly;
     const filters = {
       actives: { l: "En cours", f: (c) => !c.clientPrevenu },
-      demande: { l: "En question", f: (c) => c.statut === "demande" },
       envoyee: { l: "Envoyées", f: (c) => c.statut === "envoyee" },
       commandee: { l: "Commandées", f: (c) => c.statut === "commandee" },
       recue: { l: "Reçues", f: (c) => c.statut === "recue" },
@@ -437,18 +408,17 @@ details summary { cursor: pointer; font-weight: 600; }
     if (arrived.length) alerts += `<div class="alert info"><div class="txt"><b>${arrived.length} commande${arrived.length > 1 ? "s reçues" : " reçue"} à la centrale.</b> Vous pouvez prévenir ${arrived.length > 1 ? "les clients" : "le client"}.</div><button data-act="filter" data-v="recue">Voir</button></div>`;
     if (unseen.length) alerts += `<div class="alert info"><div class="txt"><b>${unseen.length} changement${unseen.length > 1 ? "s" : ""} de statut</b> depuis votre dernière visite (encadré${unseen.length > 1 ? "s" : ""} en bleu ci-dessous).</div>${ro ? "" : `<button data-act="seenall">Tout marquer comme vu</button>`}</div>`;
 
-    const questions = ro ? [] : demandesPour(m);
-    const envois = aEnvoyerPar(m);
+    const questions = ro ? [] : aTraiterPar(m);
     const questionsHtml = questions.length ? `<section class="panel" style="display:grid;gap:10px;border-color:var(--accent)">
-        <div class="row spread"><h2>Questions des autres magasins <span class="count">${questions.length}</span></h2>${"Notification" in window && Notification.permission === "default" ? `<button class="ghost" data-act="notifs">Activer les notifications</button>` : ""}</div>
-        <p class="muted" style="margin:0;font-size:.88rem">Répondez vite : sans réponse sous ${TOUR_H} h, la question passe au magasin suivant. Avez-vous cet article en stock ? Si vous répondez oui, la commande est marquée « commandée » et vous l'envoyez au magasin.</p>
+        <div class="row spread"><h2>Commandes des autres magasins <span class="count">${questions.length}</span></h2>${"Notification" in window && Notification.permission === "default" ? `<button class="ghost" data-act="notifs">Activer les notifications</button>` : ""}</div>
+        <p class="muted" style="margin:0;font-size:.88rem">Ces magasins vous ont envoyé la commande. Si vous avez l'article, envoyez-le et appuyez sur « Je l'envoie ». Sinon, passez la commande à la centrale.</p>
         <div class="lines" style="border:1px solid var(--line);border-radius:8px">${questions.map((c) => `<div class="line" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr) 60px auto">
-          <div style="min-width:0"><b>${esc(nom(c.magasin))}</b><div class="muted" style="font-size:.82rem">demandé le ${fmt(c.demandeLe || c.creeLe)}</div></div>
-          <div style="min-width:0"><span class="prod">${esc(c.produit)}</span> <span class="ref">${esc(c.reference)}</span><div class="muted" style="font-size:.82rem">${esc(c.marque)}</div></div>
+          <div style="min-width:0"><b>${esc(nom(c.magasin))}</b><div class="muted" style="font-size:.82rem">le ${fmt(c.creeLe)}${c.vendeur ? " · " + esc(c.vendeur) : ""}</div></div>
+          <div style="min-width:0"><span class="prod">${esc(c.produit)}</span> <span class="ref">${esc(c.reference)}</span><div class="muted" style="font-size:.82rem">${esc(c.marque)} · client ${esc(clientNom(c))}</div>${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}</div>
           <div class="qte">× ${esc(c.quantite || 1)}</div>
-          <div class="acts"><button class="s-recue" data-act="oui" data-id="${c.id}">Oui, je l'ai</button><button data-act="non" data-id="${c.id}">Non</button></div>
+          <div class="acts"><button class="s-recue" data-act="oui" data-id="${c.id}">Je l'envoie</button><button data-act="non" data-id="${c.id}">Pas en stock → centrale</button></div>
         </div>`).join("")}</div></section>` : "";
-    const envoisHtml = envois.length ? `<div class="alert info"><div class="txt"><b>À envoyer à d'autres magasins :</b> ${envois.map((c) => `${esc(c.produit)} (${esc(c.reference)}) × ${esc(c.quantite || 1)} pour ${esc(nom(c.magasin))}`).join(" ; ")}.</div></div>` : "";
+    const envoisHtml = "";
     return `
       <div class="row spread"><h1>${esc(nom(m))}</h1><span class="status-line">${mine.length} commande${mine.length > 1 ? "s" : ""} au total</span></div>
       ${alerts ? `<div class="alerts">${alerts}</div>` : ""}
@@ -468,7 +438,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
           <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
           <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
-          <label class="c6 row" for="f-demande" style="gap:8px;cursor:pointer"><input id="f-demande" type="checkbox" style="width:18px;height:18px" checked> <span><b>Demander d'abord aux autres magasins</b> <span class="muted">· d'abord ${ORDRE[m].map((x) => esc(nom(x))).join(", puis ")} (${TOUR_H} h chacun pour répondre). Si un magasin l'a, il vous l'envoie ; sinon la commande part à la centrale.</span></span></label>
+          <div class="f c2"><label class="label" for="f-dest">Envoyer à *</label><select id="f-dest" name="destinataire"><option value="">La centrale</option>${autres(m).map((x) => `<option value="${x}">${esc(nom(x))}</option>`).join("")}</select></div>
           <div class="c6 row"><button class="primary" type="submit" ${state.busy || !state.db ? "disabled" : ""}>Envoyer la commande</button></div>
         </form>
       </section>`}
@@ -504,7 +474,6 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
       ${steps(c.statut)}
       <div class="meta"><span>Client : <b style="color:var(--fg)">${esc(clientNom(c))}</b>${c.telephone ? " · " + esc(c.telephone) : ""}</span>${c.vendeur ? `<span>Vendeur : ${esc(c.vendeur)}</span>` : ""}<span>N° ${shortId(c.id)}</span>${c.dateCommande ? `<span>Commande du ${fmtDay(c.dateCommande)}</span>` : ""}<span>Envoyée le ${fmt(c.creeLe)}</span>${c.majLe && c.statut !== "envoyee" ? `<span>${esc(ST[c.statut]?.s || "")} le ${fmt(c.majLe)}</span>` : ""}${c.clientPrevenu ? `<span>Client prévenu ✓</span>` : ""}</div>
-      ${c.statut === "demande" ? `<div class="note"><b>Question :</b> ${ORDRE[c.magasin].map((x) => `${esc(nom(x))} ${c["rep_" + x] ? esc(c["rep_" + x]) : x === cibleDe(c) ? `<b>en cours</b> (jusqu'au ${fmt(new Date(finTour(c)).toISOString())})` : "à venir"}`).join(" → ")} → centrale.</div>` : ""}
       ${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}
       ${c.noteCentrale ? `<div class="note central"><b>${c.fournisseurMagasin ? "Info" : "Centrale"} :</b> ${esc(c.noteCentrale)}</div>` : ""}
       ${state.editId === c.id ? editForm(c) : acts.length ? `<div class="row">${acts.join("")}</div>` : ""}
@@ -513,7 +482,7 @@ details summary { cursor: pointer; font-weight: 600; }
 
   // ----- Centrale -----
   function centralView(lecture = false) {
-    const all = state.commandes;
+    const all = state.commandes.filter(pourCentrale);
     const ro = state.readonly;
     const counts = Object.fromEntries(Object.keys(ST).map((k) => [k, all.filter((c) => (k === "manquant" ? estManquant(c) : c.statut === k)).length]));
     const q = state.cSearch.toLowerCase();
@@ -642,15 +611,15 @@ details summary { cursor: pointer; font-weight: 600; }
       if (!(d.client || d.prenom || d.professionnel)) { toast("Remplissez au moins le nom, le prénom ou le professionnel."); return; }
       if (!d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
       const now = new Date().toISOString();
-      const doc = { ...d, quantite: Math.max(1, parseInt(d.quantite, 10) || 1), magasin: state.route, statut: f.querySelector("#f-demande").checked ? "demande" : "envoyee", demandeLe: now, questionA: ORDRE[state.route][0], questionLe: now, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
+      const dest = MAGS.includes(f.elements.destinataire && f.elements.destinataire.value) && f.elements.destinataire.value !== state.route ? f.elements.destinataire.value : "";
+      const doc = { ...d, quantite: Math.max(1, parseInt(d.quantite, 10) || 1), magasin: state.route, statut: "envoyee", fournisseurMagasin: dest, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
       doc.historique = [{ statut: doc.statut, le: now }];
-      const demande = doc.statut === "demande";
       guard(async () => {
         await state.db.collection("commandes").add(doc);
         try { const k = refKey(d.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: d.reference, designation: d.produit, marque: d.marque, majLe: now }); } catch (e) { console.error(e); }
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
         clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
-      }, demande ? "Question envoyée aux autres magasins" : "Commande envoyée à la centrale");
+      }, "Commande envoyée à " + (dest ? nom(dest) : "la centrale"));
     } else if (f.dataset.missing) {
       const c = byId(f.dataset.missing); const note = norm(f.querySelector("#miss-note").value);
       state.missingFor = null;
@@ -693,10 +662,8 @@ details summary { cursor: pointer; font-weight: 600; }
     switch (act) {
       case "vue": state.vueTous = !!b.dataset.v; state.selected.clear(); render(); break;
       case "notifs": try { Notification.requestPermission().then(() => render()); } catch {} break;
-      case "oui": if (c && c.statut === "demande") guard(() => changeStatus(c, "commandee", { fournisseurMagasin: state.route, ["rep_" + state.route]: "oui", noteCentrale: "Disponible chez " + nom(state.route) + " : le magasin vous l'envoie." }), "Merci : " + nom(c.magasin) + " est prévenu, envoyez-lui l'article"); break;
-      case "non": if (c && c.statut === "demande") guard(async () => {
-        if (cibleDe(c) === state.route) await suivant(c, "non");
-      }, "Réponse envoyée : la question passe au magasin suivant"); break;
+      case "oui": if (c && c.statut === "envoyee" && c.fournisseurMagasin === state.route) guard(() => changeStatus(c, "commandee", { noteCentrale: "Envoyé par " + nom(state.route) + "." }), nom(c.magasin) + " est prévenu que vous l'envoyez"); break;
+      case "non": if (c && c.statut === "envoyee" && c.fournisseurMagasin === state.route) guard(() => state.db.collection("commandes").doc(c.id).update({ fournisseurMagasin: "", majLe: new Date().toISOString(), vuParMagasin: false, noteCentrale: "Pas en stock chez " + nom(state.route) + " : envoyée à la centrale." }), "Commande passée à la centrale"); break;
       case "tocentrale": if (c && c.statut === "demande") guard(() => changeStatus(c, "envoyee", { vuParMagasin: true, noteCentrale: "" }), "Commande envoyée à la centrale"); break;
       case "logout": state.auth.signOut(); break;
       case "filter": state.magFilter = b.dataset.v; render(); break;
@@ -728,7 +695,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261123144521";
+  const VERSION = "20261123150005";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
