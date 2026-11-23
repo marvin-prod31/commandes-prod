@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js"></script>
+<script src="config.js?v=20261123143806"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -720,6 +720,19 @@ details summary { cursor: pointer; font-weight: 600; }
       }
     }
   });
+
+  // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
+  const VERSION = "20261123143806";
+  async function verifierVersion() {
+    try {
+      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+      const v = (await r.json()).version;
+      if (v && v !== VERSION) { saveDraft(); location.replace(location.pathname + "?v=" + encodeURIComponent(v)); }
+    } catch {}
+  }
+  verifierVersion();
+  setInterval(verifierVersion, 5 * 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) verifierVersion(); });
 
   boot();
 })();
