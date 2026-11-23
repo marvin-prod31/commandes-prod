@@ -196,7 +196,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, editId: null, editDraft: {}, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -257,6 +257,9 @@ details summary { cursor: pointer; font-weight: 600; }
 
   function listen() {
     const timer = setTimeout(() => { if (!state.loaded) { state.failed = "Les commandes ne sont pas encore joignables. Vérifiez la connexion internet."; render(); } }, 10000);
+    unsubs.push(state.db.collection("vendeurs").onSnapshot((snap) => {
+      const m = {}; snap.docs.forEach((d) => (m[d.id] = (d.data().noms || []))); state.vendeurs = m; render();
+    }, () => {}));
     unsubs.push(state.db.collection("articles").onSnapshot((snap) => {
       const m = {}; snap.docs.forEach((d) => (m[d.id] = d.data())); state.articles = m; render();
     }, () => {}));
@@ -345,6 +348,7 @@ details summary { cursor: pointer; font-weight: 600; }
     const missVal = $("#miss-note") ? $("#miss-note").value : "";
     app.innerHTML = r === "centrale" ? centralView() : (state.vueTous && VOIT_TOUT.includes(r)) ? centralView(true) : storeView(r);
     if (r !== "centrale") { restoreDraft(); syncAutre(); }
+    const vp = $("#vendeurs-panel"); if (vp) { vp.open = !!state.vendeursOpen; vp.addEventListener("toggle", () => (state.vendeursOpen = vp.open)); }
     const det = $("#settings"); if (det) { det.open = state.settingsOpen; det.addEventListener("toggle", () => (state.settingsOpen = det.open)); }
     Object.entries(nomsVals).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; });
     if ($("#miss-note") && missVal) $("#miss-note").value = missVal;
@@ -383,6 +387,16 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="f c2"><label class="label" for="e-marque">Fournisseur *</label><select id="e-marque" name="marque" required>${opts}${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${f.nom === marque ? "selected" : ""}>${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : ""}</option>`).join("")}</select></div>
       <div class="c6 row"><button class="primary" type="submit" ${state.busy ? "disabled" : ""}>Enregistrer les modifications</button><button type="button" class="ghost" data-act="noedit">Annuler</button></div>
     </form>`;
+  }
+  const vendeursDe = (m) => [...(state.vendeurs[m] || [])].sort((a, b) => a.localeCompare(b, "fr"));
+  async function enregistrerVendeurs(m, noms) { await state.db.collection("vendeurs").doc(m).set({ noms: [...new Set(noms.map(norm).filter(Boolean))] }); }
+  function vendeursBlock(m) {
+    const vs = vendeursDe(m);
+    return `<details class="panel" id="vendeurs-panel"><summary>Vendeurs de ${esc(nom(m))} (${vs.length})</summary>
+      <div style="display:grid;gap:10px;margin-top:12px">
+        <div class="row">${vs.length ? vs.map((v) => `<span class="pill" style="background:var(--surface-2);color:var(--fg)">${esc(v)} <button class="ghost" style="padding:0 4px" title="Retirer" data-act="delvendeur" data-v="${esc(v)}">×</button></span>`).join("") : `<span class="muted">Aucun vendeur enregistré : ajoutez-les ici, ou ils s'ajoutent tout seuls à la première commande.</span>`}</div>
+        <form id="vendeurs-form" class="row"><input id="v-new" placeholder="Prénom du vendeur" style="max-width:240px" value="${esc(state.vNew)}"><button type="submit">Ajouter</button></form>
+      </div></details>`;
   }
   function pill(st, c) {
     let l = (ST[st] || {}).l || st;
@@ -449,7 +463,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
           <div class="f c5"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
-          <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><input id="f-vendeur" name="vendeur" required placeholder="Prénom du vendeur" list="dl-vendeurs" autocomplete="off"><datalist id="dl-vendeurs">${[...new Set(state.commandes.filter((c) => c.magasin === state.route && c.vendeur).map((c) => norm(c.vendeur)))].map((v) => `<option value="${esc(v)}">`).join("")}</datalist></div>
+          <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
           <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
           <label class="c6 row" for="f-demande" style="gap:8px;cursor:pointer"><input id="f-demande" type="checkbox" style="width:18px;height:18px" checked> <span><b>Demander d'abord aux autres magasins</b> <span class="muted">· d'abord ${ORDRE[m].map((x) => esc(nom(x))).join(", puis ")} (${TOUR_H} h chacun pour répondre). Si un magasin l'a, il vous l'envoie ; sinon la commande part à la centrale.</span></span></label>
           <div class="c6 row"><button class="primary" type="submit" ${state.busy || !state.db ? "disabled" : ""}>Envoyer la commande</button></div>
@@ -460,7 +474,8 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="tabs" role="tablist">${Object.entries(filters).map(([k, v]) => `<button role="tab" aria-selected="${state.magFilter === k}" class="${state.magFilter === k ? "on" : ""}" data-act="filter" data-v="${k}">${v.l}<span class="n">${mine.filter(v.f).length}</span></button>`).join("")}</div>
         </div>
         ${list.length ? `<div class="cards">${list.map((c) => storeCard(c, ro)).join("")}</div>` : `<div class="empty"><h3>${mine.length ? "Aucune commande dans cette liste" : "Aucune commande pour l'instant"}</h3><p>${mine.length ? "Changez de filtre pour voir les autres." : "Saisissez la première commande client avec le formulaire ci-dessus."}</p></div>`}
-      </section>`;
+      </section>
+      ${ro ? "" : vendeursBlock(m)}`;
   }
 
   function storeCard(c, ro) {
@@ -573,7 +588,7 @@ details summary { cursor: pointer; font-weight: 600; }
   }
 
   // ---------- Draft (formulaire non envoyé) ----------
-  const DRAFT_FIELDS = ["client", "prenom", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "quantite", "note", "vendeur"];
+  const DRAFT_FIELDS = ["client", "prenom", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "quantite", "note", "vendeur", "vendeurAutre"];
   function autofillFromRef(input) {
     const hint = $("#ref-hint"); const k = refKey(input.value);
     const a = k ? state.articles[k] : null;
@@ -587,7 +602,9 @@ details summary { cursor: pointer; font-weight: 600; }
     }
     if (hint) hint.textContent = "Article déjà commandé : désignation reprise.";
   }
-  function syncAutre() { const sel = $("#f-marque"), o = $("#f-marque-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
+  function syncAutre() { syncVendeur(); syncMarque(); }
+  function syncVendeur() { const sel = $("#f-vendeur"), o = $("#f-vendeur-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
+  function syncMarque() { const sel = $("#f-marque"), o = $("#f-marque-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
   function saveDraft() { const f = $("#newform"); if (!f) return; const d = {}; DRAFT_FIELDS.forEach((k) => (d[k] = f.elements[k].value)); try { localStorage.setItem("cmd-draft-" + state.route, JSON.stringify(d)); } catch {} }
   function restoreDraft() { const f = $("#newform"); if (!f) return; try { const v = localStorage.getItem("cmd-vendeur-" + state.route); if (v && !f.elements.vendeur.value) f.elements.vendeur.value = v; } catch {} let d = null; try { d = JSON.parse(localStorage.getItem("cmd-draft-" + state.route) || "null"); } catch {} if (d) DRAFT_FIELDS.forEach((k) => { if (d[k] != null && d[k] !== "") f.elements[k].value = d[k]; }); }
   function clearDraft() { try { localStorage.removeItem("cmd-draft-" + state.route); } catch {} }
@@ -595,6 +612,7 @@ details summary { cursor: pointer; font-weight: 600; }
   // ---------- Events ----------
   const byId = (id) => pool().find((c) => c.id === id);
   document.addEventListener("input", (e) => {
+    if (e.target.id === "v-new") state.vNew = e.target.value;
     if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
     if (e.target.id === "f-ref") autofillFromRef(e.target);
     if (e.target.id === "f-produit") delete e.target.dataset.auto;
@@ -613,6 +631,9 @@ details summary { cursor: pointer; font-weight: 600; }
     if (f.id === "newform") {
       const d = {}; DRAFT_FIELDS.forEach((k) => (d[k] = norm(f.elements[k].value)));
       if (d.marque === "__autre") d.marque = d.marqueAutre.toUpperCase();
+      if (d.vendeur === "__autre") d.vendeur = d.vendeurAutre;
+      delete d.vendeurAutre;
+      const nouveauVendeur = d.vendeur && !vendeursDe(state.route).includes(d.vendeur);
       delete d.marqueAutre;
       d.codeFournisseur = FOURN_CODE[d.marque] || "";
       if (!d.client || !d.prenom || !d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
@@ -623,7 +644,8 @@ details summary { cursor: pointer; font-weight: 600; }
       guard(async () => {
         await state.db.collection("commandes").add(doc);
         try { const k = refKey(d.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: d.reference, designation: d.produit, marque: d.marque, majLe: now }); } catch (e) { console.error(e); }
-        clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); f.elements.vendeur.value = d.vendeur; syncAutre();
+        if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
+        clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
       }, demande ? "Question envoyée aux autres magasins" : "Commande envoyée à la centrale");
     } else if (f.dataset.missing) {
       const c = byId(f.dataset.missing); const note = norm(f.querySelector("#miss-note").value);
@@ -647,6 +669,10 @@ details summary { cursor: pointer; font-weight: 600; }
       upd.majLe = new Date().toISOString();
       state.editId = null; state.editDraft = {};
       guard(() => state.db.collection("commandes").doc(c.id).update(upd), "Commande modifiée");
+    } else if (f.id === "vendeurs-form") {
+      const v = norm(state.vNew); if (!v) return;
+      state.vNew = "";
+      guard(() => enregistrerVendeurs(state.route, [...vendeursDe(state.route), v]), v + " ajouté");
     } else if (f.id === "noms") {
       const noms = {}; MAGS.forEach((m) => (noms[m] = norm(f.elements[m].value) || DEFAULT_NOMS[m]));
       guard(() => state.db.doc("config/magasins").set({ noms }), "Noms enregistrés");
@@ -672,6 +698,7 @@ details summary { cursor: pointer; font-weight: 600; }
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
       case "edit": state.editId = id; state.editDraft = {}; render(); setTimeout(() => $("#e-dateCommande")?.focus(), 0); break;
       case "noedit": state.editId = null; state.editDraft = {}; render(); break;
+      case "delvendeur": { const v = b.dataset.v; guard(() => enregistrerVendeurs(state.route, vendeursDe(state.route).filter((x) => x !== v)), v + " retiré"); break; }
       case "askdel": state.confirmDel = id; render(); break;
       case "nodel": state.confirmDel = null; render(); break;
       case "del": state.confirmDel = null; if (c) guard(() => state.db.collection("commandes").doc(c.id).delete(), "Commande annulée"); break;

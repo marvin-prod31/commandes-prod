@@ -19,6 +19,10 @@ service cloud.firestore {
       allow read: if role() != '';
       allow write: if isCentrale();
     }
+    match /vendeurs/{mag} {
+      allow read: if role() != '';
+      allow write: if isCentrale() || role() == mag;
+    }
     match /articles/{ref} {
       allow read, write: if role() != '';
     }
