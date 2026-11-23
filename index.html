@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261123143806"></script>
+<script src="config.js?v=20261123144521"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -228,6 +228,7 @@ details summary { cursor: pointer; font-weight: 600; }
     else await changeStatus(c, "envoyee", { ...rep, vuParMagasin: false, noteCentrale: "Aucun magasin ne l'avait : envoyée à la centrale." });
   }
   const aEnvoyerPar = (m) => pool().filter((c) => c.fournisseurMagasin === m && c.statut === "commandee");
+  const estManquant = (c) => c.statut === "manquant" || (c.alerteManquant && c.statut === "envoyee");
   const shortId = (id) => id.slice(0, 6).toUpperCase();
   const nom = (m) => state.noms[m] || DEFAULT_NOMS[m] || m;
   const norm = (s) => String(s || "").trim();
@@ -287,7 +288,7 @@ details summary { cursor: pointer; font-weight: 600; }
   async function changeStatus(c, statut, extra = {}) {
     const now = new Date().toISOString();
     const historique = [...(Array.isArray(c.historique) ? c.historique : []), { statut, le: now }];
-    await state.db.collection("commandes").doc(c.id).update({ statut, majLe: now, vuParMagasin: false, clientPrevenu: false, historique, ...extra });
+    await state.db.collection("commandes").doc(c.id).update({ statut, majLe: now, vuParMagasin: false, clientPrevenu: false, historique, ...(statut === "commandee" || statut === "recue" ? { alerteManquant: false } : {}), ...extra });
   }
   // Question sans « oui » : tous ont dit non, ou délai dépassé -> part à la centrale.
   const escalating = new Set();
@@ -400,6 +401,7 @@ details summary { cursor: pointer; font-weight: 600; }
   }
   function pill(st, c) {
     let l = (ST[st] || {}).l || st;
+    if (c && c.alerteManquant && st === "envoyee") { return `<span class="pill p-manquant">Manquant · remis à commander</span>`; }
     if (c && c.fournisseurMagasin && st === "commandee") l = "Disponible chez " + nom(c.fournisseurMagasin);
     if (c && c.fournisseurMagasin && st === "recue") l = "Reçue de " + nom(c.fournisseurMagasin);
     return `<span class="pill p-${st}">${esc(l)}</span>`;
@@ -414,7 +416,7 @@ details summary { cursor: pointer; font-weight: 600; }
   // ----- Magasin -----
   function storeView(m) {
     const mine = state.commandes.filter((c) => c.magasin === m);
-    const missing = mine.filter((c) => c.statut === "manquant" && !c.clientPrevenu);
+    const missing = mine.filter((c) => estManquant(c) && !c.clientPrevenu);
     const arrived = mine.filter((c) => c.statut === "recue" && !c.clientPrevenu);
     const unseen = mine.filter((c) => c.vuParMagasin === false);
     const ro = state.readonly;
@@ -424,7 +426,7 @@ details summary { cursor: pointer; font-weight: 600; }
       envoyee: { l: "Envoyées", f: (c) => c.statut === "envoyee" },
       commandee: { l: "Commandées", f: (c) => c.statut === "commandee" },
       recue: { l: "Reçues", f: (c) => c.statut === "recue" },
-      manquant: { l: "Manquantes", f: (c) => c.statut === "manquant" },
+      manquant: { l: "Manquantes", f: (c) => estManquant(c) },
       toutes: { l: "Toutes", f: () => true },
     };
     const f = filters[state.magFilter] || filters.actives;
@@ -481,11 +483,11 @@ details summary { cursor: pointer; font-weight: 600; }
 
   function storeCard(c, ro) {
     const unseen = c.vuParMagasin === false;
-    const bad = c.statut === "manquant" && !c.clientPrevenu;
+    const bad = estManquant(c) && !c.clientPrevenu;
     const acts = [];
     if (!ro) {
       if (unseen) acts.push(`<button data-act="seen" data-id="${c.id}">Vu</button>`);
-      if ((c.statut === "recue" || c.statut === "manquant") && !c.clientPrevenu) acts.push(`<button class="${c.statut === "manquant" ? "s-manquant" : "s-recue"}" data-act="prevenu" data-id="${c.id}">Client prévenu</button>`);
+      if ((c.statut === "recue" || estManquant(c)) && !c.clientPrevenu) acts.push(`<button class="${estManquant(c) ? "s-manquant" : "s-recue"}" data-act="prevenu" data-id="${c.id}">Client prévenu</button>`);
       if (c.statut === "demande") acts.push(`<button data-act="tocentrale" data-id="${c.id}">Envoyer à la centrale maintenant</button>`);
       if (c.statut === "commandee" && c.fournisseurMagasin) acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Reçu de ${esc(nom(c.fournisseurMagasin))}</button>`);
       if (c.statut === "envoyee" || c.statut === "demande") {
@@ -513,10 +515,10 @@ details summary { cursor: pointer; font-weight: 600; }
   function centralView(lecture = false) {
     const all = state.commandes;
     const ro = state.readonly;
-    const counts = Object.fromEntries(Object.keys(ST).map((k) => [k, all.filter((c) => c.statut === k).length]));
+    const counts = Object.fromEntries(Object.keys(ST).map((k) => [k, all.filter((c) => (k === "manquant" ? estManquant(c) : c.statut === k)).length]));
     const q = state.cSearch.toLowerCase();
     const late = all.filter(enRetard);
-    let list = all.filter((c) => (state.cFilter === "toutes" || (state.cFilter === "retard" ? enRetard(c) : c.statut === state.cFilter)));
+    let list = all.filter((c) => (state.cFilter === "toutes" || (state.cFilter === "retard" ? enRetard(c) : state.cFilter === "manquant" ? estManquant(c) : c.statut === state.cFilter)));
     if (q) list = list.filter((c) => [clientNom(c), c.produit, c.reference, c.marque, nom(c.magasin)].some((v) => String(v || "").toLowerCase().includes(q)));
     const groups = new Map();
     for (const c of list) {
@@ -576,7 +578,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="c-st">${pill(c.statut, c)}${enRetard(c) ? `<div style="font-size:.75rem;margin-top:3px;color:var(--s-manquant);font-weight:600">En retard : ${ageJours(c)} jours</div>` : ""}${c.statut !== "envoyee" && c.vuParMagasin === false ? `<div class="muted" style="font-size:.75rem;margin-top:3px">pas encore vu par le magasin</div>` : ""}</div>
       <div class="acts">${acts.join("")}</div>
       ${state.editId === c.id ? `<div style="grid-column:1/-1">${editForm(c)}</div>` : ""}
-      ${state.missingFor === c.id ? `<form class="inline-form" data-missing="${c.id}"><input id="miss-note" placeholder="Remarque pour le magasin (ex. rupture fournisseur, retour prévu…)"><button class="s-manquant" type="submit">Confirmer : produit manquant</button><button type="button" class="ghost" data-act="nomissing">Annuler</button></form>` : ""}
+      ${state.missingFor === c.id ? `<form class="inline-form" data-missing="${c.id}"><input id="miss-note" placeholder="Remarque pour le magasin (ex. rupture fournisseur, retour prévu…) : la commande repart à commander"><button class="s-manquant" type="submit">Confirmer : produit manquant</button><button type="button" class="ghost" data-act="nomissing">Annuler</button></form>` : ""}
     </div>`;
   }
 
@@ -652,7 +654,11 @@ details summary { cursor: pointer; font-weight: 600; }
     } else if (f.dataset.missing) {
       const c = byId(f.dataset.missing); const note = norm(f.querySelector("#miss-note").value);
       state.missingFor = null;
-      if (c) guard(() => changeStatus(c, "manquant", { noteCentrale: note }), "Magasin alerté : produit manquant");
+      if (c) {
+        const now = new Date().toISOString();
+        const historique = [...(Array.isArray(c.historique) ? c.historique : []), { statut: "manquant", le: now }, { statut: "envoyee", le: now }];
+        guard(() => changeStatus(c, "envoyee", { historique, alerteManquant: true, manquantLe: now, noteCentrale: "Produit manquant à la réception" + (note ? " (" + note + ")" : "") + " : remis à commander automatiquement." }), "Magasin alerté, produit remis à commander");
+      }
     } else if (f.id === "login") {
       const qui = f.querySelector("#l-qui").value, mdp = f.querySelector("#l-mdp").value;
       if (!qui || !COMPTES[qui]) { state.loginError = "Choisissez votre magasin."; render(); return; }
@@ -722,7 +728,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261123143806";
+  const VERSION = "20261123144521";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
