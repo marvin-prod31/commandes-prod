@@ -212,7 +212,7 @@ details summary { cursor: pointer; font-weight: 600; }
   const ageJours = (c) => { const d = c.dateCommande ? new Date(c.dateCommande + "T00:00:00") : new Date(c.creeLe); const t = new Date(); t.setHours(0, 0, 0, 0); d.setHours(0, 0, 0, 0); return Math.round((t - d) / 86400000); };
   const enRetard = (c) => c.statut === "envoyee" && ageJours(c) >= RETARD_JOURS;
   const refKey = (r) => norm(r).toUpperCase().replace(/[^A-Z0-9_\-.~:@+]/g, "_").slice(0, 150);
-  const clientNom = (c) => [c.prenom, c.client].map(norm).filter(Boolean).join(" ");
+  const clientNom = (c) => { const n = [c.prenom, c.client].map(norm).filter(Boolean).join(" "), pro = norm(c.professionnel); return n && pro ? n + " (" + pro + ")" : n || pro || "Client"; };
   const pool = () => { const m = new Map(); [...state.commandes, ...state.demandes, ...state.aEnvoyer].forEach((c) => m.set(c.id, c)); return [...m.values()]; };
   const autres = (m) => MAGS.filter((x) => x !== m);
   const cibleDe = (c) => c.questionA || ORDRE[c.magasin][0];
@@ -376,7 +376,7 @@ details summary { cursor: pointer; font-weight: 600; }
     </form>`;
   }
 
-  const EDIT_FIELDS = [["client", "Nom du client", "text", true], ["prenom", "Prénom du client", "text", true], ["telephone", "Téléphone", "tel", true], ["dateCommande", "Date de commande", "date", true], ["reference", "Référence fournisseur", "text", false], ["produit", "Désignation", "text", true], ["quantite", "Quantité", "number", true], ["vendeur", "Vendeur", "text", true], ["note", "Remarque", "text", false]];
+  const EDIT_FIELDS = [["client", "Nom du client", "text", false], ["prenom", "Prénom du client", "text", false], ["professionnel", "Professionnel", "text", false], ["telephone", "Téléphone", "tel", true], ["dateCommande", "Date de commande", "date", true], ["reference", "Référence fournisseur", "text", false], ["produit", "Désignation", "text", true], ["quantite", "Quantité", "number", true], ["vendeur", "Vendeur", "text", true], ["note", "Remarque", "text", false]];
   function editForm(c) {
     const d = state.editDraft;
     const v = (k) => (d[k] != null ? d[k] : c[k] != null ? c[k] : "");
@@ -455,13 +455,14 @@ details summary { cursor: pointer; font-weight: 600; }
       <section class="panel" style="display:grid;gap:12px">
         <h2>Nouvelle commande client</h2>
         <form class="new" id="newform" autocomplete="off">
-          <div class="f c2"><label class="label" for="f-client">Nom du client *</label><input id="f-client" name="client" required placeholder="Nom du client"></div>
-          <div class="f c2"><label class="label" for="f-prenom">Prénom du client *</label><input id="f-prenom" name="prenom" required placeholder="Prénom"></div>
+          <div class="f c2"><label class="label" for="f-client">Nom du client</label><input id="f-client" name="client" placeholder="Nom du client"></div>
+          <div class="f c2"><label class="label" for="f-prenom">Prénom du client</label><input id="f-prenom" name="prenom" placeholder="Prénom"></div>
           <div class="f c2"><label class="label" for="f-tel">Téléphone du client *</label><input id="f-tel" name="telephone" type="tel" inputmode="tel" required placeholder="06 12 34 56 78"></div>
+          <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
           <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
           <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Tapez la réf. : la désignation se remplit si l'article est connu" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
-          <div class="f c5"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
+          <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
           <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
           <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
@@ -588,7 +589,7 @@ details summary { cursor: pointer; font-weight: 600; }
   }
 
   // ---------- Draft (formulaire non envoyé) ----------
-  const DRAFT_FIELDS = ["client", "prenom", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "quantite", "note", "vendeur", "vendeurAutre"];
+  const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "quantite", "note", "vendeur", "vendeurAutre"];
   function autofillFromRef(input) {
     const hint = $("#ref-hint"); const k = refKey(input.value);
     const a = k ? state.articles[k] : null;
@@ -636,7 +637,8 @@ details summary { cursor: pointer; font-weight: 600; }
       const nouveauVendeur = d.vendeur && !vendeursDe(state.route).includes(d.vendeur);
       delete d.marqueAutre;
       d.codeFournisseur = FOURN_CODE[d.marque] || "";
-      if (!d.client || !d.prenom || !d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
+      if (!(d.client || d.prenom || d.professionnel)) { toast("Remplissez au moins le nom, le prénom ou le professionnel."); return; }
+      if (!d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
       const now = new Date().toISOString();
       const doc = { ...d, quantite: Math.max(1, parseInt(d.quantite, 10) || 1), magasin: state.route, statut: f.querySelector("#f-demande").checked ? "demande" : "envoyee", demandeLe: now, questionA: ORDRE[state.route][0], questionLe: now, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
       doc.historique = [{ statut: doc.statut, le: now }];
@@ -665,6 +667,7 @@ details summary { cursor: pointer; font-weight: 600; }
       upd.marque = f.elements.marque.value;
       upd.quantite = Math.max(1, parseInt(upd.quantite, 10) || 1);
       if (EDIT_FIELDS.some(([k, , , req]) => req && !upd[k]) || !upd.marque) { toast("Remplissez tous les champs marqués *."); return; }
+      if (!(upd.client || upd.prenom || upd.professionnel)) { toast("Remplissez au moins le nom, le prénom ou le professionnel."); return; }
       upd.codeFournisseur = FOURN_CODE[upd.marque] || "";
       upd.majLe = new Date().toISOString();
       state.editId = null; state.editDraft = {};
