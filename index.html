@@ -196,7 +196,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, editId: null, editDraft: {}, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -372,6 +372,18 @@ details summary { cursor: pointer; font-weight: 600; }
     </form>`;
   }
 
+  const EDIT_FIELDS = [["client", "Nom du client", "text", true], ["prenom", "Prénom du client", "text", true], ["telephone", "Téléphone", "tel", true], ["dateCommande", "Date de commande", "date", true], ["reference", "Référence fournisseur", "text", false], ["produit", "Désignation", "text", true], ["quantite", "Quantité", "number", true], ["vendeur", "Vendeur", "text", true], ["note", "Remarque", "text", false]];
+  function editForm(c) {
+    const d = state.editDraft;
+    const v = (k) => (d[k] != null ? d[k] : c[k] != null ? c[k] : "");
+    const marque = v("marque");
+    const opts = FOURNISSEURS.some((f) => f.nom === marque) || !marque ? "" : `<option value="${esc(marque)}">${esc(marque)}</option>`;
+    return `<form id="editform" data-id="${c.id}" class="new" style="background:var(--surface-2);padding:12px;border-radius:8px" autocomplete="off">
+      ${EDIT_FIELDS.map(([k, l, t, req]) => `<div class="f ${k === "produit" || k === "note" ? "c3" : "c2"}"><label class="label" for="e-${k}">${l}${req ? " *" : ""}</label><input id="e-${k}" name="${k}" type="${t}" ${t === "number" ? 'min="1"' : ""} ${req ? "required" : ""} value="${esc(v(k))}"></div>`).join("")}
+      <div class="f c2"><label class="label" for="e-marque">Fournisseur *</label><select id="e-marque" name="marque" required>${opts}${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${f.nom === marque ? "selected" : ""}>${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : ""}</option>`).join("")}</select></div>
+      <div class="c6 row"><button class="primary" type="submit" ${state.busy ? "disabled" : ""}>Enregistrer les modifications</button><button type="button" class="ghost" data-act="noedit">Annuler</button></div>
+    </form>`;
+  }
   function pill(st, c) {
     let l = (ST[st] || {}).l || st;
     if (c && c.fournisseurMagasin && st === "commandee") l = "Disponible chez " + nom(c.fournisseurMagasin);
@@ -464,6 +476,7 @@ details summary { cursor: pointer; font-weight: 600; }
         if (state.confirmDel === c.id) acts.push(`<span class="muted" style="font-size:.85rem">Annuler cette commande ?</span><button class="s-manquant" data-act="del" data-id="${c.id}">Oui, annuler</button><button class="ghost" data-act="nodel">Non</button>`);
         else acts.push(`<button class="ghost" data-act="askdel" data-id="${c.id}">Annuler la commande</button>`);
       }
+      if (state.editId !== c.id) acts.push(`<button class="ghost" data-act="edit" data-id="${c.id}">✏️ Modifier</button>`);
     }
     return `<article class="card ${unseen ? "unseen" : ""} ${bad ? "bad" : ""}">
       <div class="head">
@@ -476,7 +489,7 @@ details summary { cursor: pointer; font-weight: 600; }
       ${c.statut === "demande" ? `<div class="note"><b>Question :</b> ${ORDRE[c.magasin].map((x) => `${esc(nom(x))} ${c["rep_" + x] ? esc(c["rep_" + x]) : x === cibleDe(c) ? `<b>en cours</b> (jusqu'au ${fmt(new Date(finTour(c)).toISOString())})` : "à venir"}`).join(" → ")} → centrale.</div>` : ""}
       ${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}
       ${c.noteCentrale ? `<div class="note central"><b>${c.fournisseurMagasin ? "Info" : "Centrale"} :</b> ${esc(c.noteCentrale)}</div>` : ""}
-      ${acts.length ? `<div class="row">${acts.join("")}</div>` : ""}
+      ${state.editId === c.id ? editForm(c) : acts.length ? `<div class="row">${acts.join("")}</div>` : ""}
     </article>`;
   }
 
@@ -536,6 +549,7 @@ details summary { cursor: pointer; font-weight: 600; }
       if (c.statut === "commandee") acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Reçue</button><button class="s-manquant" data-act="askmissing" data-id="${c.id}">Manquant</button>`);
       if (c.statut === "manquant") acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Finalement reçue</button>`);
       if (Array.isArray(c.historique) && c.historique.length > 1) acts.push(`<button class="ghost" title="Revenir au statut précédent" data-act="revert" data-id="${c.id}">Annuler</button>`);
+      acts.push(`<button class="ghost" title="Modifier la commande" data-act="edit" data-id="${c.id}">✏️</button>`);
     }
     const otherSide = state.cGroup === "marque" ? `<b>${esc(nom(c.magasin))}</b>` : `<b>${esc(c.marque)}</b>`;
     return `<div class="line">
@@ -545,6 +559,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="c-qte qte">× ${esc(c.quantite || 1)}</div>
       <div class="c-st">${pill(c.statut, c)}${enRetard(c) ? `<div style="font-size:.75rem;margin-top:3px;color:var(--s-manquant);font-weight:600">En retard : ${ageJours(c)} jours</div>` : ""}${c.statut !== "envoyee" && c.vuParMagasin === false ? `<div class="muted" style="font-size:.75rem;margin-top:3px">pas encore vu par le magasin</div>` : ""}</div>
       <div class="acts">${acts.join("")}</div>
+      ${state.editId === c.id ? `<div style="grid-column:1/-1">${editForm(c)}</div>` : ""}
       ${state.missingFor === c.id ? `<form class="inline-form" data-missing="${c.id}"><input id="miss-note" placeholder="Remarque pour le magasin (ex. rupture fournisseur, retour prévu…)"><button class="s-manquant" type="submit">Confirmer : produit manquant</button><button type="button" class="ghost" data-act="nomissing">Annuler</button></form>` : ""}
     </div>`;
   }
@@ -580,6 +595,7 @@ details summary { cursor: pointer; font-weight: 600; }
   // ---------- Events ----------
   const byId = (id) => pool().find((c) => c.id === id);
   document.addEventListener("input", (e) => {
+    if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
     if (e.target.id === "f-ref") autofillFromRef(e.target);
     if (e.target.id === "f-produit") delete e.target.dataset.auto;
     if (e.target.id === "f-marque") delete e.target.dataset.auto;
@@ -588,6 +604,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
+    if (t.closest("#editform") && t.name) state.editDraft[t.name] = t.value;
     if (t.dataset.act === "sel") { t.checked ? state.selected.add(t.dataset.id) : state.selected.delete(t.dataset.id); render(); }
   });
   document.addEventListener("submit", (e) => {
@@ -619,6 +636,17 @@ details summary { cursor: pointer; font-weight: 600; }
       state.auth.signInWithEmailAndPassword(COMPTES[qui], mdp)
         .catch(() => { state.loginError = "Mot de passe incorrect."; })
         .finally(() => { state.busy = false; render(); });
+    } else if (f.id === "editform") {
+      const c = byId(f.dataset.id); if (!c) return;
+      const upd = {};
+      EDIT_FIELDS.forEach(([k]) => (upd[k] = norm(f.elements[k].value)));
+      upd.marque = f.elements.marque.value;
+      upd.quantite = Math.max(1, parseInt(upd.quantite, 10) || 1);
+      if (EDIT_FIELDS.some(([k, , , req]) => req && !upd[k]) || !upd.marque) { toast("Remplissez tous les champs marqués *."); return; }
+      upd.codeFournisseur = FOURN_CODE[upd.marque] || "";
+      upd.majLe = new Date().toISOString();
+      state.editId = null; state.editDraft = {};
+      guard(() => state.db.collection("commandes").doc(c.id).update(upd), "Commande modifiée");
     } else if (f.id === "noms") {
       const noms = {}; MAGS.forEach((m) => (noms[m] = norm(f.elements[m].value) || DEFAULT_NOMS[m]));
       guard(() => state.db.doc("config/magasins").set({ noms }), "Noms enregistrés");
@@ -642,6 +670,8 @@ details summary { cursor: pointer; font-weight: 600; }
       case "seen": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ vuParMagasin: true })); break;
       case "seenall": guard(async () => { for (const x of state.commandes.filter((x) => x.magasin === state.route && x.vuParMagasin === false)) await state.db.collection("commandes").doc(x.id).update({ vuParMagasin: true }); }); break;
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
+      case "edit": state.editId = id; state.editDraft = {}; render(); setTimeout(() => $("#e-dateCommande")?.focus(), 0); break;
+      case "noedit": state.editId = null; state.editDraft = {}; render(); break;
       case "askdel": state.confirmDel = id; render(); break;
       case "nodel": state.confirmDel = null; render(); break;
       case "del": state.confirmDel = null; if (c) guard(() => state.db.collection("commandes").doc(c.id).delete(), "Commande annulée"); break;
