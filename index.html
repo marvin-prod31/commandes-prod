@@ -562,7 +562,7 @@ details summary { cursor: pointer; font-weight: 600; }
     if (!ro) {
       if (c.statut === "envoyee") acts.push(`<button class="s-commandee" data-act="st" data-v="commandee" data-id="${c.id}">Commandée</button>`);
       if (c.statut === "commandee") acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Reçue</button><button class="s-manquant" data-act="askmissing" data-id="${c.id}">Manquant</button>`);
-      if (c.statut === "manquant") acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Finalement reçue</button>`);
+      if (c.statut === "manquant") acts.push(`<button class="s-commandee" data-act="recommander" data-id="${c.id}">À commander</button><button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Finalement reçue</button>`);
       if (Array.isArray(c.historique) && c.historique.length > 1) acts.push(`<button class="ghost" title="Revenir au statut précédent" data-act="revert" data-id="${c.id}">Annuler</button>`);
       acts.push(`<button class="ghost" title="Modifier la commande" data-act="edit" data-id="${c.id}">✏️</button>`);
     }
@@ -699,6 +699,7 @@ details summary { cursor: pointer; font-weight: 600; }
       case "edit": state.editId = id; state.editDraft = {}; render(); setTimeout(() => $("#e-dateCommande")?.focus(), 0); break;
       case "noedit": state.editId = null; state.editDraft = {}; render(); break;
       case "delvendeur": { const v = b.dataset.v; guard(() => enregistrerVendeurs(state.route, vendeursDe(state.route).filter((x) => x !== v)), v + " retiré"); break; }
+      case "recommander": if (c && c.statut === "manquant") guard(() => changeStatus(c, "envoyee", { noteCentrale: "Produit manquant : remis à commander" + (c.noteCentrale ? " (" + c.noteCentrale + ")" : "") + "." }), "Remis à commander : le magasin est prévenu"); break;
       case "askdel": state.confirmDel = id; render(); break;
       case "nodel": state.confirmDel = null; render(); break;
       case "del": state.confirmDel = null; if (c) guard(() => state.db.collection("commandes").doc(c.id).delete(), "Commande annulée"); break;
