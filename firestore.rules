@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function roles() {
+      return {
+        'colomiers@prod-commandes.fr': 'm1',
+        'muret@prod-commandes.fr': 'm2',
+        'pamiers@prod-commandes.fr': 'm3',
+        'dax@prod-commandes.fr': 'm4',
+        'centrale@prod-commandes.fr': 'centrale'
+      };
+    }
+    function role() {
+      return request.auth != null && request.auth.token.email in roles() ? roles()[request.auth.token.email] : '';
+    }
+    function isCentrale() { return role() == 'centrale'; }
+
+    match /config/{doc} {
+      allow read: if role() != '';
+      allow write: if isCentrale();
+    }
+    match /articles/{ref} {
+      allow read, write: if role() != '';
+    }
+    match /commandes/{id} {
+      // Prod Colomiers (m1) voit aussi les commandes des autres magasins.
+      allow read: if isCentrale() || role() == 'm1' || (role() != '' && resource.data.magasin == role())
+                  // Questions entre magasins : tous les magasins voient les questions en cours,
+                  // et le magasin qui a dit « oui » voit la commande qu'il doit envoyer.
+                  || (role() != '' && resource.data.statut == 'demande')
+                  || (role() != '' && resource.data.fournisseurMagasin == role());
+      allow create: if isCentrale() || (role() != '' && request.resource.data.magasin == role() && request.resource.data.statut in ['envoyee', 'demande']);
+      // Un magasin peut marquer « vu » / « client prévenu », sans changer le statut ni le magasin.
+      // Prod Colomiers (m1) peut passer n'importe quelle commande en « envoyée », « commandée », « reçue » ou « manquant ».
+      allow update: if isCentrale()
+                    || (role() == 'm1' && request.resource.data.magasin == resource.data.magasin
+                        && request.resource.data.statut in ['envoyee', 'commandee', 'recue', 'manquant'])
+                    || (role() != '' && resource.data.magasin == role()
+                      && request.resource.data.magasin == role()
+                      && request.resource.data.statut == resource.data.statut)
+                    // Question en cours : chaque magasin peut répondre (non, ou oui -> commandée), ou l'envoyer à la centrale.
+                    || (role() != '' && resource.data.statut == 'demande'
+                        && request.resource.data.magasin == resource.data.magasin
+                        && request.resource.data.statut in ['demande', 'commandee', 'envoyee'])
+                    // Article fourni par un autre magasin : le magasin demandeur le marque reçu.
+                    || (role() != '' && resource.data.magasin == role() && resource.data.statut == 'commandee'
+                        && resource.data.fournisseurMagasin is string
+                        && request.resource.data.magasin == role() && request.resource.data.statut == 'recue');
+      allow delete: if isCentrale() || (role() != '' && resource.data.magasin == role() && resource.data.statut in ['envoyee', 'demande']);
+    }
+  }
+}
