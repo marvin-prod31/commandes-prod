@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261123150005"></script>
+<script src="config.js?v=20261124085313"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -348,7 +348,7 @@ details summary { cursor: pointer; font-weight: 600; }
     </form>`;
   }
 
-  const EDIT_FIELDS = [["client", "Nom du client", "text", false], ["prenom", "Prénom du client", "text", false], ["professionnel", "Professionnel", "text", false], ["telephone", "Téléphone", "tel", true], ["dateCommande", "Date de commande", "date", true], ["reference", "Référence fournisseur", "text", false], ["produit", "Désignation", "text", true], ["quantite", "Quantité", "number", true], ["vendeur", "Vendeur", "text", true], ["note", "Remarque", "text", false]];
+  const EDIT_FIELDS = [["client", "Nom du client", "text", false], ["prenom", "Prénom du client", "text", false], ["professionnel", "Professionnel", "text", false], ["telephone", "Téléphone", "tel", true], ["dateCommande", "Date de commande", "date", true], ["reference", "Référence fournisseur", "text", false], ["codeBarres", "Code-barres", "text", false], ["produit", "Désignation", "text", true], ["quantite", "Quantité", "number", true], ["vendeur", "Vendeur", "text", true], ["note", "Remarque", "text", false]];
   function editForm(c) {
     const d = state.editDraft;
     const v = (k) => (d[k] != null ? d[k] : c[k] != null ? c[k] : "");
@@ -414,7 +414,7 @@ details summary { cursor: pointer; font-weight: 600; }
         <p class="muted" style="margin:0;font-size:.88rem">Ces magasins vous ont envoyé la commande. Si vous avez l'article, envoyez-le et appuyez sur « Je l'envoie ». Sinon, passez la commande à la centrale.</p>
         <div class="lines" style="border:1px solid var(--line);border-radius:8px">${questions.map((c) => `<div class="line" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr) 60px auto">
           <div style="min-width:0"><b>${esc(nom(c.magasin))}</b><div class="muted" style="font-size:.82rem">le ${fmt(c.creeLe)}${c.vendeur ? " · " + esc(c.vendeur) : ""}</div></div>
-          <div style="min-width:0"><span class="prod">${esc(c.produit)}</span> <span class="ref">${esc(c.reference)}</span><div class="muted" style="font-size:.82rem">${esc(c.marque)} · client ${esc(clientNom(c))}</div>${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}</div>
+          <div style="min-width:0"><span class="prod">${esc(c.produit)}</span> <span class="ref">${esc(c.reference)}</span> ${c.codeBarres ? `<span class="ref" title="Code-barres">▥ ${esc(c.codeBarres)}</span>` : ""}<div class="muted" style="font-size:.82rem">${esc(c.marque)} · client ${esc(clientNom(c))}</div>${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}</div>
           <div class="qte">× ${esc(c.quantite || 1)}</div>
           <div class="acts"><button class="s-recue" data-act="oui" data-id="${c.id}">Je l'envoie</button><button data-act="non" data-id="${c.id}">Pas en stock → centrale</button></div>
         </div>`).join("")}</div></section>` : "";
@@ -433,6 +433,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
           <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
           <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Tapez la réf. : la désignation se remplit si l'article est connu" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
+          <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Facultatif" autocomplete="off"></div>
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
           <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
@@ -469,7 +470,7 @@ details summary { cursor: pointer; font-weight: 600; }
     return `<article class="card ${unseen ? "unseen" : ""} ${bad ? "bad" : ""}">
       <div class="head">
         ${unseen ? `<span class="new-badge">Nouveau</span>` : ""}
-        <div class="grow"><span class="prod">${esc(c.produit)}</span> <span class="muted">× ${esc(c.quantite || 1)}</span> · <b>${esc(c.marque)}</b> ${c.reference ? `<span class="ref">${esc(c.reference)}</span>` : ""}</div>
+        <div class="grow"><span class="prod">${esc(c.produit)}</span> <span class="muted">× ${esc(c.quantite || 1)}</span> · <b>${esc(c.marque)}</b> ${c.reference ? `<span class="ref">${esc(c.reference)}</span>` : ""} ${c.codeBarres ? `<span class="ref" title="Code-barres">▥ ${esc(c.codeBarres)}</span>` : ""}</div>
         ${pill(c.statut, c)}
       </div>
       ${steps(c.statut)}
@@ -488,7 +489,7 @@ details summary { cursor: pointer; font-weight: 600; }
     const q = state.cSearch.toLowerCase();
     const late = all.filter(enRetard);
     let list = all.filter((c) => (state.cFilter === "toutes" || (state.cFilter === "retard" ? enRetard(c) : state.cFilter === "manquant" ? estManquant(c) : c.statut === state.cFilter)));
-    if (q) list = list.filter((c) => [clientNom(c), c.produit, c.reference, c.marque, nom(c.magasin)].some((v) => String(v || "").toLowerCase().includes(q)));
+    if (q) list = list.filter((c) => [clientNom(c), c.produit, c.reference, c.codeBarres, c.marque, nom(c.magasin)].some((v) => String(v || "").toLowerCase().includes(q)));
     const groups = new Map();
     for (const c of list) {
       const k = state.cGroup === "marque" ? brandKey(c.marque) || "(SANS MARQUE)" : c.magasin;
@@ -542,7 +543,7 @@ details summary { cursor: pointer; font-weight: 600; }
     return `<div class="line">
       <div>${!ro && c.statut === "envoyee" ? `<input type="checkbox" aria-label="Sélectionner" data-act="sel" data-id="${c.id}" ${state.selected.has(c.id) ? "checked" : ""}>` : ""}</div>
       <div style="min-width:0">${otherSide}<div class="muted" style="font-size:.82rem">${esc(clientNom(c))}${c.telephone ? " · " + esc(c.telephone) : ""}${c.vendeur ? " · vendeur " + esc(c.vendeur) : ""} · ${c.dateCommande ? fmtDay(c.dateCommande) : fmt(c.creeLe)}</div></div>
-      <div class="c-prod" style="min-width:0"><span class="prod">${esc(c.produit)}</span> ${c.reference ? `<span class="ref">${esc(c.reference)}</span>` : ""}${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}${c.noteCentrale ? `<div style="font-size:.82rem;color:var(--s-manquant)">${esc(c.noteCentrale)}</div>` : ""}</div>
+      <div class="c-prod" style="min-width:0"><span class="prod">${esc(c.produit)}</span> ${c.reference ? `<span class="ref">${esc(c.reference)}</span>` : ""} ${c.codeBarres ? `<span class="ref" title="Code-barres">▥ ${esc(c.codeBarres)}</span>` : ""}${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}${c.noteCentrale ? `<div style="font-size:.82rem;color:var(--s-manquant)">${esc(c.noteCentrale)}</div>` : ""}</div>
       <div class="c-qte qte">× ${esc(c.quantite || 1)}</div>
       <div class="c-st">${pill(c.statut, c)}${enRetard(c) ? `<div style="font-size:.75rem;margin-top:3px;color:var(--s-manquant);font-weight:600">En retard : ${ageJours(c)} jours</div>` : ""}${c.statut !== "envoyee" && c.vuParMagasin === false ? `<div class="muted" style="font-size:.75rem;margin-top:3px">pas encore vu par le magasin</div>` : ""}</div>
       <div class="acts">${acts.join("")}</div>
@@ -560,13 +561,14 @@ details summary { cursor: pointer; font-weight: 600; }
   }
 
   // ---------- Draft (formulaire non envoyé) ----------
-  const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "quantite", "note", "vendeur", "vendeurAutre"];
+  const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
   function autofillFromRef(input) {
     const hint = $("#ref-hint"); const k = refKey(input.value);
     const a = k ? state.articles[k] : null;
     if (!a) { if (hint) hint.textContent = ""; return; }
     const f = input.form, des = f.elements.produit, sel = f.elements.marque;
     if (!des.value || des.dataset.auto === "1") { des.value = a.designation || ""; des.dataset.auto = "1"; }
+    const cb = f.elements.codeBarres; if (cb && a.codeBarres && (!cb.value || cb.dataset.auto === "1")) { cb.value = a.codeBarres; cb.dataset.auto = "1"; }
     if (a.marque && (!sel.value || sel.dataset.auto === "1")) {
       if ([...sel.options].some((o) => o.value === a.marque)) sel.value = a.marque;
       else { sel.value = "__autre"; f.elements.marqueAutre.value = a.marque; }
@@ -616,7 +618,7 @@ details summary { cursor: pointer; font-weight: 600; }
       doc.historique = [{ statut: doc.statut, le: now }];
       guard(async () => {
         await state.db.collection("commandes").add(doc);
-        try { const k = refKey(d.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: d.reference, designation: d.produit, marque: d.marque, majLe: now }); } catch (e) { console.error(e); }
+        try { const k = refKey(d.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: d.reference, designation: d.produit, marque: d.marque, ...(d.codeBarres ? { codeBarres: d.codeBarres } : {}), majLe: now }); } catch (e) { console.error(e); }
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
         clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
       }, "Commande envoyée à " + (dest ? nom(dest) : "la centrale"));
@@ -695,7 +697,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261123150005";
+  const VERSION = "20261124085313";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
