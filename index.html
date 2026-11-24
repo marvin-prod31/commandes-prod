@@ -183,7 +183,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124101529"></script>
+<script src="config.js?v=20261124165825"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -441,7 +441,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c2"><label class="label" for="f-tel">Téléphone du client *</label><input id="f-tel" name="telephone" type="tel" inputmode="tel" required placeholder="06 12 34 56 78"></div>
           <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
           <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
-          <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Tapez la réf. : la désignation se remplit si l'article est connu" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
+          <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Remplie par le code-barres" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
           <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Scannez ou tapez le code-barres" autocomplete="off"><span id="cb-hint" class="muted" style="font-size:.8rem"></span></div>
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
           <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
@@ -801,7 +801,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124101529";
+  const VERSION = "20261124165825";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
