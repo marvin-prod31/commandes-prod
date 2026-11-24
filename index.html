@@ -91,6 +91,7 @@ textarea { resize: vertical; min-height: 42px; }
 form.new { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 form.new .f { display: grid; gap: 4px; }
 form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form.new .c1 { grid-column: span 1; } form.new .c5 { grid-column: span 5; } form.new .c4 { grid-column: span 4; } form.new .c6 { grid-column: span 6; }
+[data-lock].locked, select.locked { background: var(--surface-2); color: var(--fg); opacity: 1; }
 .xa-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,2fr) 70px auto; gap: 8px; align-items: end; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
 @media (max-width: 720px) { .xa-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { form.new { grid-template-columns: repeat(2, minmax(0, 1fr)); } form.new .c2, form.new .c3, form.new .c4, form.new .c5, form.new .c6 { grid-column: span 2; } form.new .c1 { grid-column: span 1; } }
@@ -179,7 +180,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124094552"></script>
+<script src="config.js?v=20261124100018"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -198,7 +199,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -321,7 +322,7 @@ details summary { cursor: pointer; font-weight: 600; }
     const nomsVals = {}; document.querySelectorAll("#noms input").forEach((i) => (nomsVals[i.id] = i.value));
     const missVal = $("#miss-note") ? $("#miss-note").value : "";
     app.innerHTML = r === "centrale" ? centralView() : (state.vueTous && VOIT_TOUT.includes(r)) ? centralView(true) : storeView(r);
-    if (r !== "centrale") { restoreDraft(); syncAutre(); }
+    if (r !== "centrale") { restoreDraft(); syncAutre(); appliquerVerrou(); }
     const vp = $("#vendeurs-panel"); if (vp) { vp.open = !!state.vendeursOpen; vp.addEventListener("toggle", () => (state.vendeursOpen = vp.open)); }
     const det = $("#settings"); if (det) { det.open = state.settingsOpen; det.addEventListener("toggle", () => (state.settingsOpen = det.open)); }
     Object.entries(nomsVals).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; });
@@ -435,7 +436,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
           <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
           <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Tapez la réf. : la désignation se remplit si l'article est connu" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
-          <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Facultatif" autocomplete="off"></div>
+          <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Scannez ou tapez le code-barres" autocomplete="off"><span id="cb-hint" class="muted" style="font-size:.8rem"></span></div>
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
           <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
@@ -568,10 +569,10 @@ ${extraArtsHtml()}
   const XA_KEYS = ["reference", "codeBarres", "marque", "produit", "quantite"];
   function extraArtsHtml() {
     const rows = state.extraArts.map((x, i) => `<div class="c6 xa-row" data-xi="${i}">
-      <div class="f"><label class="label">Réf. fournisseur</label><input data-xk="reference" value="${esc(x.reference || "")}" autocomplete="off"></div>
-      <div class="f"><label class="label">Code-barres</label><input data-xk="codeBarres" inputmode="numeric" value="${esc(x.codeBarres || "")}" autocomplete="off"></div>
-      <div class="f"><label class="label">Fournisseur *</label><select data-xk="marque"><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${x.marque === f.nom ? "selected" : ""}>${esc(f.nom)}</option>`).join("")}${x.marque && !FOURNISSEURS.some((f) => f.nom === x.marque) ? `<option selected value="${esc(x.marque)}">${esc(x.marque)}</option>` : ""}</select></div>
-      <div class="f"><label class="label">Désignation *</label><input data-xk="produit" value="${esc(x.produit || "")}"></div>
+      <div class="f"><label class="label">Code-barres</label><input data-xk="codeBarres" inputmode="numeric" placeholder="Scannez ou tapez" value="${esc(x.codeBarres || "")}" autocomplete="off">${!x.manuel && cbKey(x.codeBarres).length >= 8 && !x.produit ? `<button type="button" class="ghost" data-act="xmanuel" data-v="${i}" style="padding:2px 8px;font-size:.8rem">Inconnu : saisir à la main</button>` : ""}</div>
+      <div class="f"><label class="label">Réf. fournisseur</label><input data-xk="reference" value="${esc(x.reference || "")}" autocomplete="off" ${x.manuel ? "" : "readonly class=\"locked\""}></div>
+      <div class="f"><label class="label">Fournisseur *</label><select data-xk="marque" ${x.manuel ? "" : "disabled class=\"locked\""}><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${x.marque === f.nom ? "selected" : ""}>${esc(f.nom)}</option>`).join("")}${x.marque && !FOURNISSEURS.some((f) => f.nom === x.marque) ? `<option selected value="${esc(x.marque)}">${esc(x.marque)}</option>` : ""}</select></div>
+      <div class="f"><label class="label">Désignation *</label><input data-xk="produit" value="${esc(x.produit || "")}" ${x.manuel ? "" : "readonly class=\"locked\""}></div>
       <div class="f"><label class="label">Qté</label><input data-xk="quantite" type="number" min="1" value="${esc(x.quantite || 1)}"></div>
       <button type="button" class="ghost" data-act="delart" data-v="${i}" title="Retirer cet article">✕</button>
     </div>`).join("");
@@ -589,8 +590,14 @@ ${extraArtsHtml()}
   function autofillExtra(row, i, key) {
     const x = state.extraArts[i]; if (!x) return;
     const a = chercheArticle(key === "reference" ? x.reference : "", key === "codeBarres" ? x.codeBarres : "");
-    if (!a) return;
+    if (!a) {
+      if (!x.manuel && key === "codeBarres") { const had = x.produit; x.reference = ""; x.produit = ""; x.marque = ""; for (const k of ["reference", "produit", "marque"]) { const el = row.querySelector(`[data-xk="${k}"]`); if (el) el.value = ""; }
+        const needBtn = cbKey(x.codeBarres).length >= 8, hasBtn = !!row.querySelector('[data-act="xmanuel"]'); if (needBtn !== hasBtn || had) { saveExtra(); saveDraft(); render(); setTimeout(() => { const el = document.querySelector(`.xa-row[data-xi="${i}"] [data-xk="codeBarres"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 0); } }
+      return;
+    }
     x.auto = x.auto || {};
+    if (!x.manuel) x.auto = { reference: 1, codeBarres: 1, produit: 1, marque: 1 };
+    { const btn = row.querySelector('[data-act="xmanuel"]'); if (btn) btn.remove(); }
     for (const [k, v] of [["reference", a.reference], ["codeBarres", a.codeBarres], ["produit", a.designation], ["marque", a.marque]]) {
       if (!v || k === key) continue;
       if (!x[k] || x.auto[k]) { x[k] = v; x.auto[k] = 1; const el = row.querySelector(`[data-xk="${k}"]`); if (el) { if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v)) el.add(new Option(v, v)); el.value = v; } }
@@ -608,11 +615,26 @@ ${extraArtsHtml()}
     }
     CAT.n = rows.length;
   }).catch(() => {}), 0);
+  // Référence, désignation et fournisseur verrouillés : remplis par le code-barres (demande de Marvin 24/11),
+  // sauf après « Saisir à la main » pour un article absent du catalogue.
+  function appliquerVerrou() {
+    const f = $("#newform"); if (!f) return;
+    for (const k of ["reference", "produit", "marque"]) { const el = f.elements[k]; if (!el) continue; const lock = !state.manuel; if (el.tagName === "SELECT") el.disabled = lock; else el.readOnly = lock; el.classList.toggle("locked", lock); el.title = lock ? "Rempli automatiquement par le code-barres" : ""; }
+    const ma = f.elements.marqueAutre; if (ma) ma.readOnly = !state.manuel;
+    const h = $("#cb-hint"); if (h && !h.textContent) h.innerHTML = state.manuel ? "Saisie à la main activée." : "La référence, la désignation et le fournisseur se remplissent avec le code-barres.";
+  }
   function autofillFromCb(input) {
-    const v = cbKey(input.value); const hint = $("#ref-hint");
+    const v = cbKey(input.value); const hint = $("#ref-hint"); const ch = $("#cb-hint");
     const a = v.length >= 6 ? (Object.values(state.articles).find((x) => cbKey(x.codeBarres) === v) || CAT.cb[v]) : null;
-    if (!a) return;
-    const f = input.form, ref = f.elements.reference;
+    const f = input.form;
+    if (!a) {
+      if (!state.manuel) { for (const k of ["reference", "produit"]) { f.elements[k].value = ""; } f.elements.marque.value = ""; }
+      if (ch) ch.innerHTML = v.length >= 8 && !state.manuel ? `Code-barres inconnu du catalogue. <button type="button" class="ghost" data-act="manuel" style="padding:2px 8px">Saisir à la main</button>` : "";
+      return;
+    }
+    if (ch) ch.textContent = "Article trouvé : " + (a.designation || "");
+    const ref = f.elements.reference;
+    if (!state.manuel) { ref.dataset.auto = "1"; f.elements.produit.dataset.auto = "1"; f.elements.marque.dataset.auto = "1"; if (!a.reference) ref.value = ""; }
     if (a.reference && (!ref.value || ref.dataset.auto === "1")) { ref.value = a.reference; ref.dataset.auto = "1"; }
     autofillFromRef(ref, a);
   }
@@ -667,6 +689,7 @@ ${extraArtsHtml()}
       delete d.marqueAutre;
       d.codeFournisseur = FOURN_CODE[d.marque] || "";
       if (!(d.client || d.prenom || d.professionnel)) { toast("Remplissez au moins le nom, le prénom ou le professionnel."); return; }
+      if (!state.manuel && (!d.marque || !d.produit)) { toast("Scannez ou tapez un code-barres connu, ou appuyez sur « Saisir à la main »."); return; }
       if (!d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
       const now = new Date().toISOString();
       const dest = MAGS.includes(f.elements.destinataire && f.elements.destinataire.value) && f.elements.destinataire.value !== state.route ? f.elements.destinataire.value : "";
@@ -683,7 +706,7 @@ ${extraArtsHtml()}
       guard(async () => {
         for (const doc of docs) await state.db.collection("commandes").add(doc);
         for (const l of lignes) { try { const k = refKey(l.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: l.reference, designation: l.produit, marque: l.marque, ...(l.codeBarres ? { codeBarres: l.codeBarres } : {}), majLe: now }); } catch (e) { console.error(e); } }
-        state.extraArts = []; saveExtra();
+        state.extraArts = []; saveExtra(); state.manuel = false; const ch = $("#cb-hint"); if (ch) ch.textContent = "";
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
         clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
       }, (docs.length > 1 ? docs.length + " articles envoyés à " : "Commande envoyée à ") + (dest ? nom(dest) : "la centrale"));
@@ -739,6 +762,8 @@ ${extraArtsHtml()}
       case "seen": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ vuParMagasin: true })); break;
       case "seenall": guard(async () => { for (const x of state.commandes.filter((x) => x.magasin === state.route && x.vuParMagasin === false)) await state.db.collection("commandes").doc(x.id).update({ vuParMagasin: true }); }); break;
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
+      case "manuel": state.manuel = true; { const ch = $("#cb-hint"); if (ch) ch.textContent = ""; } appliquerVerrou(); $("#f-ref")?.focus(); break;
+      case "xmanuel": saveDraft(); if (state.extraArts[+b.dataset.v]) state.extraArts[+b.dataset.v].manuel = true; saveExtra(); render(); break;
       case "addart": saveDraft(); state.extraArts.push({ quantite: 1 }); saveExtra(); render(); setTimeout(() => { const r = document.querySelectorAll(".xa-row"); r[r.length - 1]?.querySelector("input")?.focus(); }, 0); break;
       case "delart": saveDraft(); state.extraArts.splice(+b.dataset.v, 1); saveExtra(); render(); break;
       case "edit": state.editId = id; state.editDraft = {}; render(); setTimeout(() => $("#e-dateCommande")?.focus(), 0); break;
@@ -764,7 +789,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124094552";
+  const VERSION = "20261124100018";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
