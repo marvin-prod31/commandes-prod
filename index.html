@@ -16,6 +16,7 @@
 <style>
 /* Layout: bandeau d'onglets (4 magasins + centrale) au-dessus d'une colonne de travail ; la centrale regroupe les commandes en blocs par marque ou par magasin. */
 :root {
+  --m1: #2563eb; --m2: #16a34a; --m3: #ea580c; --m4: #9333ea;
   --bg: #f3f5f7;
   --surface: #ffffff;
   --surface-2: #e9edf1;
@@ -92,6 +93,8 @@ form.new { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap:
 form.new .f { display: grid; gap: 4px; }
 form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form.new .c1 { grid-column: span 1; } form.new .c5 { grid-column: span 5; } form.new .c4 { grid-column: span 4; } form.new .c6 { grid-column: span 6; }
 [data-lock].locked, select.locked { background: var(--surface-2); color: var(--fg); opacity: 1; }
+.mdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.mtag { font-weight: 700; }
 .xa-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,2fr) 70px auto; gap: 8px; align-items: end; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
 @media (max-width: 720px) { .xa-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { form.new { grid-template-columns: repeat(2, minmax(0, 1fr)); } form.new .c2, form.new .c3, form.new .c4, form.new .c5, form.new .c6 { grid-column: span 2; } form.new .c1 { grid-column: span 1; } }
@@ -180,7 +183,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124100018"></script>
+<script src="config.js?v=20261124101529"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -217,6 +220,9 @@ details summary { cursor: pointer; font-weight: 600; }
   // Commande adressée à un autre magasin (menu « Envoyer à », demande de Marvin 23/11) : champ fournisseurMagasin.
   const aTraiterPar = (m) => pool().filter((c) => c.fournisseurMagasin === m && c.magasin !== m && c.statut === "envoyee");
   const pourCentrale = (c) => !c.fournisseurMagasin;
+  // Code couleur par magasin sur l'écran centrale (demande de Marvin 24/11) : Colomiers bleu, Muret vert, Pamiers orange, Dax violet.
+  const magDot = (m) => MAGS.includes(m) ? `<span class="mdot" style="background:var(--${m})"></span>` : "";
+  const magTag = (m) => `<span class="mtag" style="color:var(--${m})">${magDot(m)}${esc(nom(m))}</span>`;
   const estManquant = (c) => c.statut === "manquant" || (c.alerteManquant && c.statut === "envoyee");
   const shortId = (id) => id.slice(0, 6).toUpperCase();
   const nom = (m) => state.noms[m] || DEFAULT_NOMS[m] || m;
@@ -523,14 +529,19 @@ ${extraArtsHtml()}
     const env = items.filter((c) => c.statut === "envoyee");
     const sel = env.filter((c) => state.selected.has(c.id));
     const sub = state.cGroup === "marque"
-      ? MAGS.map((m) => [m, items.filter((c) => c.magasin === m).length]).filter(([, n]) => n).map(([m, n]) => `${esc(nom(m))} ${n}`).join(" · ")
+      ? MAGS.map((m) => [m, items.filter((c) => c.magasin === m).length]).filter(([, n]) => n).map(([m, n]) => `${magDot(m)}${esc(nom(m))} ${n}`).join(" · ")
       : [...new Set(items.map((c) => norm(c.marque)))].length + " marque(s)";
     return `<section class="group">
       <div class="gh">
-        <h3>${esc(title)}${state.cGroup === "marque" && FOURN_CODE[k] ? ` <span class="ref">${esc(FOURN_CODE[k])}</span>` : ""}<span class="count">${items.length} ligne${items.length > 1 ? "s" : ""} · ${items.reduce((s, c) => s + (Number(c.quantite) || 1), 0)} article(s)</span><div class="muted" style="font-weight:500;font-family:var(--f-body);font-size:.82rem">${sub}</div></h3>
+        <h3>${state.cGroup === "marque" ? "" : magDot(k)}${esc(title)}${state.cGroup === "marque" && FOURN_CODE[k] ? ` <span class="ref">${esc(FOURN_CODE[k])}</span>` : ""}<span class="count">${items.length} ligne${items.length > 1 ? "s" : ""} · ${items.reduce((s, c) => s + (Number(c.quantite) || 1), 0)} article(s)</span><div class="muted" style="font-weight:500;font-family:var(--f-body);font-size:.82rem">${sub}</div></h3>
         ${!ro && env.length ? `<button class="s-commandee" data-act="bulk" data-k="${esc(k)}" ${state.busy ? "disabled" : ""}>${sel.length ? `Marquer ${sel.length} sélection${sel.length > 1 ? "s" : ""} commandée${sel.length > 1 ? "s" : ""}` : `Tout marquer commandé (${env.length})`}</button>` : ""}
       </div>
-      <div class="lines">${items.map((c) => centralLine(c, ro)).join("")}</div>
+      ${state.cGroup === "marque" ? MAGS.filter((m) => items.some((c) => c.magasin === m)).map((m) => {
+        // Par marque : un sous-bloc par magasin (demande de Marvin 24/11), pour passer la commande fournisseur d'un coup.
+        const its = items.filter((c) => c.magasin === m), envM = its.filter((c) => c.statut === "envoyee");
+        return `<div class="sub-mag" style="border-left:5px solid var(--${m})"><div class="row spread" style="padding:8px 12px;background:var(--surface-2);border-top:1px solid var(--line)"><b>${magTag(m)} <span class="muted" style="font-weight:500">· ${its.length} ligne${its.length > 1 ? "s" : ""} · ${its.reduce((s2, c) => s2 + (Number(c.quantite) || 1), 0)} article(s)</span></b>${!ro && envM.length ? `<button class="s-commandee" data-act="bulk" data-k="${esc(k)}" data-m="${m}" ${state.busy ? "disabled" : ""}>Commandé pour ${esc(nom(m))} (${envM.length})</button>` : ""}</div>
+          <div class="lines">${its.map((c) => centralLine(c, ro)).join("")}</div></div>`;
+      }).join("") : `<div class="lines">${items.map((c) => centralLine(c, ro)).join("")}</div>`}
     </section>`;
   }
 
@@ -543,8 +554,8 @@ ${extraArtsHtml()}
       if (Array.isArray(c.historique) && c.historique.length > 1) acts.push(`<button class="ghost" title="Revenir au statut précédent" data-act="revert" data-id="${c.id}">Annuler</button>`);
       acts.push(`<button class="ghost" title="Modifier la commande" data-act="edit" data-id="${c.id}">✏️</button>`);
     }
-    const otherSide = state.cGroup === "marque" ? `<b>${esc(nom(c.magasin))}</b>` : `<b>${esc(c.marque)}</b>`;
-    return `<div class="line">
+    const otherSide = state.cGroup === "marque" ? magTag(c.magasin) : `<b>${esc(c.marque)}</b>`;
+    return `<div class="line" style="border-left:4px solid var(--${c.magasin})">
       <div>${!ro && c.statut === "envoyee" ? `<input type="checkbox" aria-label="Sélectionner" data-act="sel" data-id="${c.id}" ${state.selected.has(c.id) ? "checked" : ""}>` : ""}</div>
       <div style="min-width:0">${otherSide}<div class="muted" style="font-size:.82rem">${esc(clientNom(c))}${c.telephone ? " · " + esc(c.telephone) : ""}${c.vendeur ? " · vendeur " + esc(c.vendeur) : ""} · ${c.dateCommande ? fmtDay(c.dateCommande) : fmt(c.creeLe)}</div></div>
       <div class="c-prod" style="min-width:0"><span class="prod">${esc(c.produit)}</span> ${c.reference ? `<span class="ref">${esc(c.reference)}</span>` : ""} ${c.codeBarres ? `<span class="ref" title="Code-barres">▥ ${esc(c.codeBarres)}</span>` : ""}${c.note ? `<div class="muted" style="font-size:.82rem">${esc(c.note)}</div>` : ""}${c.noteCentrale ? `<div style="font-size:.82rem;color:var(--s-manquant)">${esc(c.noteCentrale)}</div>` : ""}</div>
@@ -779,7 +790,8 @@ ${extraArtsHtml()}
       case "revert": if (c) guard(() => revert(c), "Statut précédent rétabli"); break;
       case "bulk": {
         const k = b.dataset.k;
-        const env = state.commandes.filter((x) => x.statut === "envoyee" && (state.cGroup === "marque" ? (brandKey(x.marque) || "(SANS MARQUE)") === k : x.magasin === k));
+        const m = b.dataset.m || "";
+        const env = state.commandes.filter(pourCentrale).filter((x) => x.statut === "envoyee" && (!m || x.magasin === m) && (state.cGroup === "marque" ? (brandKey(x.marque) || "(SANS MARQUE)") === k : x.magasin === k));
         const sel = env.filter((x) => state.selected.has(x.id));
         const targets = sel.length ? sel : env;
         guard(async () => { for (const x of targets) { await changeStatus(x, "commandee"); state.selected.delete(x.id); } }, `${targets.length} commande(s) marquée(s) commandée(s)`);
@@ -789,7 +801,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124100018";
+  const VERSION = "20261124101529";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
