@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124090004"></script>
+<script src="config.js?v=20261124091544"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -563,9 +563,19 @@ details summary { cursor: pointer; font-weight: 600; }
   // ---------- Draft (formulaire non envoyé) ----------
   const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
   const cbKey = (v) => norm(v).replace(/\s+/g, "");
+  // Catalogue des tarifs fournisseurs (catalogue.json, importé des mails de Marvin le 24/11) : référence, code-barres, désignation, fournisseur.
+  const CAT = { ref: {}, cb: {}, n: 0 };
+  setTimeout(() => fetch("catalogue.json?v=" + (typeof VERSION !== "undefined" ? VERSION : "1")).then((r) => (r.ok ? r.json() : [])).then((rows) => {
+    for (const [reference, codeBarres, designation, marque] of rows) {
+      const a = { reference, codeBarres, designation, marque, catalogue: true };
+      const k = refKey(reference); if (k && !CAT.ref[k]) CAT.ref[k] = a;
+      const c = cbKey(codeBarres); if (c && !CAT.cb[c]) CAT.cb[c] = a;
+    }
+    CAT.n = rows.length;
+  }).catch(() => {}), 0);
   function autofillFromCb(input) {
     const v = cbKey(input.value); const hint = $("#ref-hint");
-    const a = v.length >= 6 ? Object.values(state.articles).find((x) => cbKey(x.codeBarres) === v) : null;
+    const a = v.length >= 6 ? (Object.values(state.articles).find((x) => cbKey(x.codeBarres) === v) || CAT.cb[v]) : null;
     if (!a) return;
     const f = input.form, ref = f.elements.reference;
     if (a.reference && (!ref.value || ref.dataset.auto === "1")) { ref.value = a.reference; ref.dataset.auto = "1"; }
@@ -573,7 +583,7 @@ details summary { cursor: pointer; font-weight: 600; }
   }
   function autofillFromRef(input, trouve) {
     const hint = $("#ref-hint"); const k = refKey(input.value);
-    const a = trouve || (k ? state.articles[k] : null);
+    const a = trouve || (k ? state.articles[k] || CAT.ref[k] : null);
     if (!a) { if (hint) hint.textContent = ""; return; }
     const f = input.form, des = f.elements.produit, sel = f.elements.marque;
     if (!des.value || des.dataset.auto === "1") { des.value = a.designation || ""; des.dataset.auto = "1"; }
@@ -583,7 +593,7 @@ details summary { cursor: pointer; font-weight: 600; }
       else { sel.value = "__autre"; f.elements.marqueAutre.value = a.marque; }
       sel.dataset.auto = "1";
     }
-    if (hint) hint.textContent = "Article connu : désignation reprise.";
+    if (hint) hint.textContent = a.catalogue ? "Article du catalogue " + (a.marque || "") + " : désignation reprise." : "Article connu : désignation reprise.";
   }
   function syncAutre() { syncVendeur(); syncMarque(); }
   function syncVendeur() { const sel = $("#f-vendeur"), o = $("#f-vendeur-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
@@ -707,7 +717,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124090004";
+  const VERSION = "20261124091544";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
