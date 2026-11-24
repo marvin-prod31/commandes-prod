@@ -177,7 +177,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124085313"></script>
+<script src="config.js?v=20261124090004"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -562,9 +562,18 @@ details summary { cursor: pointer; font-weight: 600; }
 
   // ---------- Draft (formulaire non envoyé) ----------
   const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
-  function autofillFromRef(input) {
+  const cbKey = (v) => norm(v).replace(/\s+/g, "");
+  function autofillFromCb(input) {
+    const v = cbKey(input.value); const hint = $("#ref-hint");
+    const a = v.length >= 6 ? Object.values(state.articles).find((x) => cbKey(x.codeBarres) === v) : null;
+    if (!a) return;
+    const f = input.form, ref = f.elements.reference;
+    if (a.reference && (!ref.value || ref.dataset.auto === "1")) { ref.value = a.reference; ref.dataset.auto = "1"; }
+    autofillFromRef(ref, a);
+  }
+  function autofillFromRef(input, trouve) {
     const hint = $("#ref-hint"); const k = refKey(input.value);
-    const a = k ? state.articles[k] : null;
+    const a = trouve || (k ? state.articles[k] : null);
     if (!a) { if (hint) hint.textContent = ""; return; }
     const f = input.form, des = f.elements.produit, sel = f.elements.marque;
     if (!des.value || des.dataset.auto === "1") { des.value = a.designation || ""; des.dataset.auto = "1"; }
@@ -574,7 +583,7 @@ details summary { cursor: pointer; font-weight: 600; }
       else { sel.value = "__autre"; f.elements.marqueAutre.value = a.marque; }
       sel.dataset.auto = "1";
     }
-    if (hint) hint.textContent = "Article déjà commandé : désignation reprise.";
+    if (hint) hint.textContent = "Article connu : désignation reprise.";
   }
   function syncAutre() { syncVendeur(); syncMarque(); }
   function syncVendeur() { const sel = $("#f-vendeur"), o = $("#f-vendeur-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
@@ -589,6 +598,7 @@ details summary { cursor: pointer; font-weight: 600; }
     if (e.target.id === "v-new") state.vNew = e.target.value;
     if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
     if (e.target.id === "f-ref") autofillFromRef(e.target);
+    if (e.target.id === "f-cb") autofillFromCb(e.target);
     if (e.target.id === "f-produit") delete e.target.dataset.auto;
     if (e.target.id === "f-marque") delete e.target.dataset.auto;
     if (e.target.closest("#newform")) { syncAutre(); saveDraft(); }
@@ -697,7 +707,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124085313";
+  const VERSION = "20261124090004";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
