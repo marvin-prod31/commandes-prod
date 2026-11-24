@@ -91,6 +91,8 @@ textarea { resize: vertical; min-height: 42px; }
 form.new { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 form.new .f { display: grid; gap: 4px; }
 form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form.new .c1 { grid-column: span 1; } form.new .c5 { grid-column: span 5; } form.new .c4 { grid-column: span 4; } form.new .c6 { grid-column: span 6; }
+.xa-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,2fr) 70px auto; gap: 8px; align-items: end; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+@media (max-width: 720px) { .xa-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { form.new { grid-template-columns: repeat(2, minmax(0, 1fr)); } form.new .c2, form.new .c3, form.new .c4, form.new .c5, form.new .c6 { grid-column: span 2; } form.new .c1 { grid-column: span 1; } }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -177,7 +179,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124091544"></script>
+<script src="config.js?v=20261124094518"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -196,7 +198,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -439,6 +441,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
           <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
           <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
+${extraArtsHtml()}
           <div class="f c2"><label class="label" for="f-dest">Envoyer à *</label><select id="f-dest" name="destinataire"><option value="">La centrale</option>${autres(m).map((x) => `<option value="${x}">${esc(nom(x))}</option>`).join("")}</select></div>
           <div class="c6 row"><button class="primary" type="submit" ${state.busy || !state.db ? "disabled" : ""}>Envoyer la commande</button></div>
         </form>
@@ -474,7 +477,7 @@ details summary { cursor: pointer; font-weight: 600; }
         ${pill(c.statut, c)}
       </div>
       ${steps(c.statut)}
-      <div class="meta"><span>Client : <b style="color:var(--fg)">${esc(clientNom(c))}</b>${c.telephone ? " · " + esc(c.telephone) : ""}</span>${c.vendeur ? `<span>Vendeur : ${esc(c.vendeur)}</span>` : ""}<span>N° ${shortId(c.id)}</span>${c.dateCommande ? `<span>Commande du ${fmtDay(c.dateCommande)}</span>` : ""}<span>Envoyée le ${fmt(c.creeLe)}</span>${c.majLe && c.statut !== "envoyee" ? `<span>${esc(ST[c.statut]?.s || "")} le ${fmt(c.majLe)}</span>` : ""}${c.clientPrevenu ? `<span>Client prévenu ✓</span>` : ""}</div>
+      <div class="meta"><span>Client : <b style="color:var(--fg)">${esc(clientNom(c))}</b>${c.telephone ? " · " + esc(c.telephone) : ""}</span>${c.vendeur ? `<span>Vendeur : ${esc(c.vendeur)}</span>` : ""}<span>N° ${shortId(c.id)}</span>${c.groupe ? `<span>Article ${esc(c.groupeN)}/${esc(c.groupeTotal)} de la commande client</span>` : ""}${c.dateCommande ? `<span>Commande du ${fmtDay(c.dateCommande)}</span>` : ""}<span>Envoyée le ${fmt(c.creeLe)}</span>${c.majLe && c.statut !== "envoyee" ? `<span>${esc(ST[c.statut]?.s || "")} le ${fmt(c.majLe)}</span>` : ""}${c.clientPrevenu ? `<span>Client prévenu ✓</span>` : ""}</div>
       ${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}
       ${c.noteCentrale ? `<div class="note central"><b>${c.fournisseurMagasin ? "Info" : "Centrale"} :</b> ${esc(c.noteCentrale)}</div>` : ""}
       ${state.editId === c.id ? editForm(c) : acts.length ? `<div class="row">${acts.join("")}</div>` : ""}
@@ -561,6 +564,38 @@ details summary { cursor: pointer; font-weight: 600; }
   }
 
   // ---------- Draft (formulaire non envoyé) ----------
+  // Plusieurs articles pour un même client (demande de Marvin 24/11) : une commande par article, liées par « groupe ».
+  const XA_KEYS = ["reference", "codeBarres", "marque", "produit", "quantite"];
+  function extraArtsHtml() {
+    const rows = state.extraArts.map((x, i) => `<div class="c6 xa-row" data-xi="${i}">
+      <div class="f"><label class="label">Réf. fournisseur</label><input data-xk="reference" value="${esc(x.reference || "")}" autocomplete="off"></div>
+      <div class="f"><label class="label">Code-barres</label><input data-xk="codeBarres" inputmode="numeric" value="${esc(x.codeBarres || "")}" autocomplete="off"></div>
+      <div class="f"><label class="label">Fournisseur *</label><select data-xk="marque"><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${x.marque === f.nom ? "selected" : ""}>${esc(f.nom)}</option>`).join("")}${x.marque && !FOURNISSEURS.some((f) => f.nom === x.marque) ? `<option selected value="${esc(x.marque)}">${esc(x.marque)}</option>` : ""}</select></div>
+      <div class="f"><label class="label">Désignation *</label><input data-xk="produit" value="${esc(x.produit || "")}"></div>
+      <div class="f"><label class="label">Qté</label><input data-xk="quantite" type="number" min="1" value="${esc(x.quantite || 1)}"></div>
+      <button type="button" class="ghost" data-act="delart" data-v="${i}" title="Retirer cet article">✕</button>
+    </div>`).join("");
+    return `${state.extraArts.length ? `<div class="c6 muted" style="font-size:.85rem">Autres articles pour ce client (article 1 = celui du dessus) :</div>${rows}` : ""}
+          <div class="c6"><button type="button" data-act="addart">+ Ajouter un article</button></div>`;
+  }
+  function saveExtra() { try { localStorage.setItem("cmd-extra-" + state.route, JSON.stringify(state.extraArts)); } catch {} }
+  function loadExtra() { try { const v = JSON.parse(localStorage.getItem("cmd-extra-" + state.route) || "[]"); state.extraArts = Array.isArray(v) ? v : []; } catch { state.extraArts = []; } }
+  function chercheArticle(ref, cb) {
+    const k = refKey(ref || ""), c = cbKey(cb || "");
+    if (k && (state.articles[k] || CAT.ref[k])) return state.articles[k] || CAT.ref[k];
+    if (c.length >= 6) return Object.values(state.articles).find((x) => cbKey(x.codeBarres) === c) || CAT.cb[c] || null;
+    return null;
+  }
+  function autofillExtra(row, i, key) {
+    const x = state.extraArts[i]; if (!x) return;
+    const a = chercheArticle(key === "reference" ? x.reference : "", key === "codeBarres" ? x.codeBarres : "");
+    if (!a) return;
+    x.auto = x.auto || {};
+    for (const [k, v] of [["reference", a.reference], ["codeBarres", a.codeBarres], ["produit", a.designation], ["marque", a.marque]]) {
+      if (!v || k === key) continue;
+      if (!x[k] || x.auto[k]) { x[k] = v; x.auto[k] = 1; const el = row.querySelector(`[data-xk="${k}"]`); if (el) { if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v)) el.add(new Option(v, v)); el.value = v; } }
+    }
+  }
   const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
   const cbKey = (v) => norm(v).replace(/\s+/g, "");
   // Catalogue des tarifs fournisseurs (catalogue.json, importé des mails de Marvin le 24/11) : référence, code-barres, désignation, fournisseur.
@@ -599,7 +634,7 @@ details summary { cursor: pointer; font-weight: 600; }
   function syncVendeur() { const sel = $("#f-vendeur"), o = $("#f-vendeur-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
   function syncMarque() { const sel = $("#f-marque"), o = $("#f-marque-autre"); if (sel && o) { o.hidden = sel.value !== "__autre"; o.required = !o.hidden; } }
   function saveDraft() { const f = $("#newform"); if (!f) return; const d = {}; DRAFT_FIELDS.forEach((k) => (d[k] = f.elements[k].value)); try { localStorage.setItem("cmd-draft-" + state.route, JSON.stringify(d)); } catch {} }
-  function restoreDraft() { const f = $("#newform"); if (!f) return; try { const v = localStorage.getItem("cmd-vendeur-" + state.route); if (v && !f.elements.vendeur.value) f.elements.vendeur.value = v; } catch {} let d = null; try { d = JSON.parse(localStorage.getItem("cmd-draft-" + state.route) || "null"); } catch {} if (d) DRAFT_FIELDS.forEach((k) => { if (d[k] != null && d[k] !== "") f.elements[k].value = d[k]; }); }
+  function restoreDraft() { const f = $("#newform"); if (!f) return; if (state.extraRoute !== state.route) { state.extraRoute = state.route; loadExtra(); } try { const v = localStorage.getItem("cmd-vendeur-" + state.route); if (v && !f.elements.vendeur.value) f.elements.vendeur.value = v; } catch {} let d = null; try { d = JSON.parse(localStorage.getItem("cmd-draft-" + state.route) || "null"); } catch {} if (d) DRAFT_FIELDS.forEach((k) => { if (d[k] != null && d[k] !== "") f.elements[k].value = d[k]; }); }
   function clearDraft() { try { localStorage.removeItem("cmd-draft-" + state.route); } catch {} }
 
   // ---------- Events ----------
@@ -609,6 +644,7 @@ details summary { cursor: pointer; font-weight: 600; }
     if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
     if (e.target.id === "f-ref") autofillFromRef(e.target);
     if (e.target.id === "f-cb") autofillFromCb(e.target);
+    if (e.target.dataset && e.target.dataset.xk) { const row = e.target.closest(".xa-row"), i = +row.dataset.xi, k = e.target.dataset.xk; if (state.extraArts[i]) { state.extraArts[i][k] = e.target.value; if (state.extraArts[i].auto) delete state.extraArts[i].auto[k]; if (k === "reference" || k === "codeBarres") autofillExtra(row, i, k); saveExtra(); } }
     if (e.target.id === "f-produit") delete e.target.dataset.auto;
     if (e.target.id === "f-marque") delete e.target.dataset.auto;
     if (e.target.closest("#newform")) { syncAutre(); saveDraft(); }
@@ -634,14 +670,23 @@ details summary { cursor: pointer; font-weight: 600; }
       if (!d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
       const now = new Date().toISOString();
       const dest = MAGS.includes(f.elements.destinataire && f.elements.destinataire.value) && f.elements.destinataire.value !== state.route ? f.elements.destinataire.value : "";
-      const doc = { ...d, quantite: Math.max(1, parseInt(d.quantite, 10) || 1), magasin: state.route, statut: "envoyee", fournisseurMagasin: dest, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
-      doc.historique = [{ statut: doc.statut, le: now }];
+      const extras = state.extraArts.map((x) => Object.fromEntries(XA_KEYS.map((k) => [k, norm(x[k])]))).filter((x) => x.reference || x.codeBarres || x.produit || x.marque);
+      if (extras.some((x) => !x.marque || !x.produit)) { toast("Chaque article ajouté doit avoir un fournisseur et une désignation."); return; }
+      const lignes = [{ reference: d.reference, codeBarres: d.codeBarres, marque: d.marque, produit: d.produit, quantite: d.quantite }, ...extras];
+      const groupe = lignes.length > 1 ? Math.random().toString(36).slice(2, 10) : "";
+      const docs = lignes.map((l, i) => {
+        const doc = { ...d, ...l, codeFournisseur: FOURN_CODE[l.marque] || "", quantite: Math.max(1, parseInt(l.quantite, 10) || 1), magasin: state.route, statut: "envoyee", fournisseurMagasin: dest, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
+        if (groupe) { doc.groupe = groupe; doc.groupeN = i + 1; doc.groupeTotal = lignes.length; }
+        doc.historique = [{ statut: doc.statut, le: now }];
+        return doc;
+      });
       guard(async () => {
-        await state.db.collection("commandes").add(doc);
-        try { const k = refKey(d.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: d.reference, designation: d.produit, marque: d.marque, ...(d.codeBarres ? { codeBarres: d.codeBarres } : {}), majLe: now }); } catch (e) { console.error(e); }
+        for (const doc of docs) await state.db.collection("commandes").add(doc);
+        for (const l of lignes) { try { const k = refKey(l.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: l.reference, designation: l.produit, marque: l.marque, ...(l.codeBarres ? { codeBarres: l.codeBarres } : {}), majLe: now }); } catch (e) { console.error(e); } }
+        state.extraArts = []; saveExtra();
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
         clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
-      }, "Commande envoyée à " + (dest ? nom(dest) : "la centrale"));
+      }, (docs.length > 1 ? docs.length + " articles envoyés à " : "Commande envoyée à ") + (dest ? nom(dest) : "la centrale"));
     } else if (f.dataset.missing) {
       const c = byId(f.dataset.missing); const note = norm(f.querySelector("#miss-note").value);
       state.missingFor = null;
@@ -694,6 +739,8 @@ details summary { cursor: pointer; font-weight: 600; }
       case "seen": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ vuParMagasin: true })); break;
       case "seenall": guard(async () => { for (const x of state.commandes.filter((x) => x.magasin === state.route && x.vuParMagasin === false)) await state.db.collection("commandes").doc(x.id).update({ vuParMagasin: true }); }); break;
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
+      case "addart": saveDraft(); state.extraArts.push({ quantite: 1 }); saveExtra(); render(); setTimeout(() => { const r = document.querySelectorAll(".xa-row"); r[r.length - 1]?.querySelector("input")?.focus(); }, 0); break;
+      case "delart": saveDraft(); state.extraArts.splice(+b.dataset.v, 1); saveExtra(); render(); break;
       case "edit": state.editId = id; state.editDraft = {}; render(); setTimeout(() => $("#e-dateCommande")?.focus(), 0); break;
       case "noedit": state.editId = null; state.editDraft = {}; render(); break;
       case "delvendeur": { const v = b.dataset.v; guard(() => enregistrerVendeurs(state.route, vendeursDe(state.route).filter((x) => x !== v)), v + " retiré"); break; }
@@ -717,7 +764,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124091544";
+  const VERSION = "20261124094518";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
