@@ -144,6 +144,8 @@ form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form
 .fiche .fl { display: grid; }
 .fline { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto auto; gap: 6px 14px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
 .fline:first-child { border-top: 0; }
+.fsub { padding: 8px 16px 6px; font-family: var(--f-display); font-weight: 700; font-size: .9rem; letter-spacing: .03em; color: var(--accent); border-top: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.fsub:first-child { border-top: 0; }
 .fline.unseen { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 .fline.bad { background: var(--s-manquant-bg); }
 .fline .q { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; text-align: center; line-height: 1; }
@@ -218,7 +220,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126202521"></script>
+<script src="config.js?v=20261126202700"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -531,8 +533,16 @@ details summary { cursor: pointer; font-weight: 600; }
         ${notes.length ? `<div class="note">${esc(notes.join(" · "))}</div>` : ""}
         ${!ro && aPrevenir.length ? `<div><button class="${aPrevenir.some(estManquant) ? "s-manquant" : "s-recue"}" data-act="prevenuclient" data-ids="${aPrevenir.map((c) => c.id).join(",")}">Client prévenu${aPrevenir.length > 1 ? ` (${aPrevenir.length} articles)` : ""}</button></div>` : ""}
       </div>
-      <div class="fl">${g.map((c) => storeLine(c, ro)).join("")}</div>
+      <div class="fl">${parFournisseur(g)}</div>
     </article>`;
+  }
+  // Articles de la fiche classés par fournisseur (demande de Marvin 26/11), avec un intertitre s'il y en a plusieurs.
+  function parFournisseur(g, ro) {
+    const m = new Map();
+    for (const c of g) { const k = brandKey(c.marque) || "(SANS FOURNISSEUR)"; if (!m.has(k)) m.set(k, []); m.get(k).push(c); }
+    const ks = [...m.keys()].sort((a, b) => a.localeCompare(b, "fr"));
+    return ks.map((k) => { const its = m.get(k), q = its.reduce((s, c) => s + (Number(c.quantite) || 1), 0);
+      return (ks.length > 1 ? `<div class="fsub">${esc(k)}${FOURN_CODE[k] ? ` <span class="ref">${esc(FOURN_CODE[k])}</span>` : ""}<span class="muted"> · ${q} article${q > 1 ? "s" : ""}</span></div>` : "") + its.map((c) => storeLine(c, state.readonly)).join(""); }).join("");
   }
   function storeLine(c, ro) {
     const unseen = c.vuParMagasin === false, bad = estManquant(c) && !c.clientPrevenu;
@@ -1078,7 +1088,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126202521";
+  const VERSION = "20261126202700";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
