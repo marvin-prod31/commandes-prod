@@ -183,7 +183,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261124165825"></script>
+<script src="config.js?v=20261126115255"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -202,7 +202,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), donFor: null, missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, xFour: "", demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -500,6 +500,9 @@ ${extraArtsHtml()}
     const late = all.filter(enRetard);
     let list = all.filter((c) => (state.cFilter === "toutes" || (state.cFilter === "retard" ? enRetard(c) : state.cFilter === "manquant" ? estManquant(c) : c.statut === state.cFilter)));
     if (q) list = list.filter((c) => [clientNom(c), c.produit, c.reference, c.codeBarres, c.marque, nom(c.magasin)].some((v) => String(v || "").toLowerCase().includes(q)));
+    exportList = list; exportLabel = (state.cFilter === "toutes" ? "Tous statuts" : state.cFilter === "retard" ? "En retard" : ({ envoyee: "À commander", commandee: "Commandées", recue: "Reçues", manquant: "Manquantes" })[state.cFilter] || "") + (q ? " · recherche « " + state.cSearch + " »" : "");
+    const xBrands = [...new Set(list.map((c) => brandKey(c.marque) || "(SANS MARQUE)"))].sort((a, b) => a.localeCompare(b, "fr"));
+    if (state.xFour && !xBrands.includes(state.xFour)) state.xFour = "";
     const groups = new Map();
     for (const c of list) {
       const k = state.cGroup === "marque" ? brandKey(c.marque) || "(SANS MARQUE)" : c.magasin;
@@ -518,10 +521,66 @@ ${extraArtsHtml()}
           <div class="tabs"><button class="${state.cGroup === "marque" ? "on" : ""}" data-act="group" data-v="marque">Par marque</button><button class="${state.cGroup === "magasin" ? "on" : ""}" data-act="group" data-v="magasin">Par magasin</button></div>
           <div class="tabs"><button class="${state.cFilter === "toutes" ? "on" : ""}" data-act="cfilter" data-v="toutes">Tous statuts<span class="n">${all.length}</span></button></div>
         </div>
+        <div class="row" style="gap:6px"><select id="x-four" aria-label="Fournisseur à exporter" style="max-width:240px"><option value="">Tous les fournisseurs (${list.length})</option>${xBrands.map((k) => `<option value="${esc(k)}" ${state.xFour === k ? "selected" : ""}>${esc(k)} (${list.filter((c) => (brandKey(c.marque) || "(SANS MARQUE)") === k).length})</option>`).join("")}</select><button data-act="export" data-v="xlsx" ${list.length ? "" : "disabled"} title="Exporter la liste affichée en Excel">⬇ Excel</button><button data-act="export" data-v="pdf" ${list.length ? "" : "disabled"} title="Exporter la liste affichée en PDF">⬇ PDF</button></div>
         <div style="flex:1 1 220px;max-width:320px"><input id="c-search" type="search" placeholder="Chercher client, produit, réf…" value="${esc(state.cSearch)}" aria-label="Chercher"></div>
       </div>
       ${keys.length ? keys.map((k) => groupBlock(k, groups.get(k), ro)).join("") : `<div class="empty"><h3>${all.length ? "Rien dans cette vue" : "Aucune commande reçue pour l'instant"}</h3><p>${all.length ? "Changez de statut ou de recherche." : "Les commandes saisies par les magasins apparaîtront ici, classées par marque."}</p></div>`}
       ${ro || lecture ? "" : settingsBlock()}`;
+  }
+
+  // ---------- Export Excel / PDF par fournisseur (demande de Marvin 26/11) ----------
+  let exportList = [], exportLabel = "";
+  const libs = {};
+  const loadScript = (src) => libs[src] || (libs[src] = new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => { delete libs[src]; ko(new Error("Chargement impossible : " + src)); }; document.head.appendChild(s); }));
+  function exportData() {
+    const four = state.xFour;
+    const rows = exportList.filter((c) => !four || (brandKey(c.marque) || "(SANS MARQUE)") === four)
+      .slice().sort((a, b) => (brandKey(a.marque) || "").localeCompare(brandKey(b.marque) || "", "fr") || MAGS.indexOf(a.magasin) - MAGS.indexOf(b.magasin) || String(a.creeLe).localeCompare(String(b.creeLe)));
+    const byFour = new Map();
+    for (const c of rows) { const k = brandKey(c.marque) || "(SANS MARQUE)"; if (!byFour.has(k)) byFour.set(k, []); byFour.get(k).push(c); }
+    const recap = (items) => {
+      const m = new Map();
+      for (const c of items) {
+        const k = cbKey(c.codeBarres) || refKey(c.reference) || norm(c.produit).toUpperCase();
+        if (!m.has(k)) m.set(k, { reference: c.reference || "", codeBarres: c.codeBarres || "", produit: c.produit || "", qte: 0, mags: {} });
+        const r = m.get(k), q = Number(c.quantite) || 1; r.qte += q; r.mags[c.magasin] = (r.mags[c.magasin] || 0) + q;
+      }
+      return [...m.values()].map((r) => ({ ...r, detail: MAGS.filter((x) => r.mags[x]).map((x) => nom(x) + " " + r.mags[x]).join(", ") }));
+    };
+    const ligne = (c) => ({ fournisseur: brandKey(c.marque) || "(SANS MARQUE)", code: FOURN_CODE[brandKey(c.marque)] || c.codeFournisseur || "", magasin: nom(c.magasin), reference: c.reference || "", codeBarres: c.codeBarres || "", produit: c.produit || "", qte: Number(c.quantite) || 1, client: clientNom(c), telephone: c.telephone || "", vendeur: c.vendeur || "", date: c.dateCommande ? fmtDay(c.dateCommande) : fmt(c.creeLe), statut: estManquant(c) ? "Manquant" : (ST[c.statut] || {}).l || c.statut, note: c.note || "", numero: shortId(c.id) });
+    const nomFichier = (ext) => "commandes-" + (four ? four.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : "tous-fournisseurs") + "-" + today() + "." + ext;
+    return { rows, byFour, recap, ligne, nomFichier, four };
+  }
+  async function exporterExcel() {
+    await loadScript("lib/xlsx.mini.min.js");
+    const { rows, byFour, recap, ligne, nomFichier } = exportData();
+    const wb = XLSX.utils.book_new();
+    const recapRows = [];
+    for (const [k, items] of byFour) for (const r of recap(items)) recapRows.push({ "Fournisseur": k, "Code fourn.": FOURN_CODE[k] || "", "Réf. fournisseur": r.reference, "Code-barres": r.codeBarres, "Désignation": r.produit, "Quantité totale": r.qte, "Par magasin": r.detail });
+    const ws1 = XLSX.utils.json_to_sheet(recapRows); ws1["!cols"] = [{ wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 48 }, { wch: 10 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "À commander (total)");
+    const det = rows.map(ligne).map((l) => ({ "Fournisseur": l.fournisseur, "Code fourn.": l.code, "Magasin": l.magasin, "Réf. fournisseur": l.reference, "Code-barres": l.codeBarres, "Désignation": l.produit, "Quantité": l.qte, "Client": l.client, "Téléphone": l.telephone, "Vendeur": l.vendeur, "Date commande": l.date, "Statut": l.statut, "Remarque": l.note, "N°": l.numero }));
+    const ws2 = XLSX.utils.json_to_sheet(det); ws2["!cols"] = [{ wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 48 }, { wch: 9 }, { wch: 26 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 14 }, { wch: 30 }, { wch: 9 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "Détail par magasin");
+    XLSX.writeFile(wb, nomFichier("xlsx"));
+  }
+  async function exporterPdf() {
+    await loadScript("lib/jspdf.umd.min.js"); await loadScript("lib/jspdf.plugin.autotable.min.js");
+    const { byFour, recap, ligne, nomFichier } = exportData();
+    const doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const COUL = { m1: [37, 99, 235], m2: [22, 163, 74], m3: [234, 88, 12], m4: [147, 51, 234] };
+    let first = true;
+    for (const [k, items] of byFour) {
+      if (!first) doc.addPage(); first = false;
+      const qte = items.reduce((s, c) => s + (Number(c.quantite) || 1), 0);
+      doc.setFontSize(15); doc.text(k + (FOURN_CODE[k] ? "  (" + FOURN_CODE[k] + ")" : ""), 14, 15);
+      doc.setFontSize(9); doc.setTextColor(90); doc.text(items.length + " ligne(s) · " + qte + " article(s) · " + exportLabel + " · exporté le " + new Date().toLocaleString("fr-FR"), 14, 21); doc.setTextColor(0);
+      doc.autoTable({ startY: 25, head: [["Réf. fournisseur", "Code-barres", "Désignation", "Qté totale", "Par magasin"]], body: recap(items).map((r) => [r.reference, r.codeBarres, r.produit, r.qte, r.detail]), styles: { fontSize: 8.5 }, headStyles: { fillColor: [31, 95, 139] }, columnStyles: { 3: { halign: "center", fontStyle: "bold" } }, margin: { left: 14, right: 14 } });
+      doc.setFontSize(11); doc.text("Détail par magasin", 14, doc.lastAutoTable.finalY + 9);
+      doc.autoTable({ startY: doc.lastAutoTable.finalY + 12, head: [["Magasin", "Client", "Téléphone", "Vendeur", "Date", "Réf.", "Désignation", "Qté", "Statut"]], body: items.map((c) => { const l = ligne(c); return [l.magasin, l.client, l.telephone, l.vendeur, l.date, l.reference || l.codeBarres, l.produit, l.qte, l.statut]; }), styles: { fontSize: 8 }, headStyles: { fillColor: [60, 70, 80] }, columnStyles: { 7: { halign: "center" } }, margin: { left: 14, right: 14 },
+        didParseCell: (d) => { if (d.section === "body" && d.column.index === 0) { const c = items[d.row.index]; if (c && COUL[c.magasin]) { d.cell.styles.textColor = COUL[c.magasin]; d.cell.styles.fontStyle = "bold"; } } } });
+    }
+    doc.save(nomFichier("pdf"));
   }
 
   function groupBlock(k, items, ro) {
@@ -551,6 +610,7 @@ ${extraArtsHtml()}
       if (c.statut === "envoyee") acts.push(`<button class="s-commandee" data-act="st" data-v="commandee" data-id="${c.id}">Commandée</button>`);
       if (c.statut === "commandee") acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Reçue</button><button class="s-manquant" data-act="askmissing" data-id="${c.id}">Manquant</button>`);
       if (c.statut === "manquant") acts.push(`<button class="s-commandee" data-act="recommander" data-id="${c.id}">À commander</button><button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Finalement reçue</button>`);
+      if (["envoyee", "commandee", "manquant"].includes(c.statut) && (Number(c.quantite) || 1) > 1) acts.push(`<button class="s-recue" title="La centrale donne une partie de la quantité : le reste reste en commande" data-act="askdon" data-id="${c.id}">Donner une partie</button>`);
       if (Array.isArray(c.historique) && c.historique.length > 1) acts.push(`<button class="ghost" title="Revenir au statut précédent" data-act="revert" data-id="${c.id}">Annuler</button>`);
       acts.push(`<button class="ghost" title="Modifier la commande" data-act="edit" data-id="${c.id}">✏️</button>`);
     }
@@ -563,6 +623,7 @@ ${extraArtsHtml()}
       <div class="c-st">${pill(c.statut, c)}${enRetard(c) ? `<div style="font-size:.75rem;margin-top:3px;color:var(--s-manquant);font-weight:600">En retard : ${ageJours(c)} jours</div>` : ""}${c.statut !== "envoyee" && c.vuParMagasin === false ? `<div class="muted" style="font-size:.75rem;margin-top:3px">pas encore vu par le magasin</div>` : ""}</div>
       <div class="acts">${acts.join("")}</div>
       ${state.editId === c.id ? `<div style="grid-column:1/-1">${editForm(c)}</div>` : ""}
+      ${state.donFor === c.id ? `<form class="inline-form" data-don="${c.id}"><label for="don-qte" style="font-weight:600">Quantité donnée à ${esc(nom(c.magasin))}</label><input id="don-qte" type="number" inputmode="numeric" min="1" max="${(Number(c.quantite) || 1) - 1}" value="${(Number(c.quantite) || 1) - 1}" style="max-width:90px" required><span class="muted">sur ${esc(c.quantite)} demandé(s) : le reste reste en commande</span><button class="s-recue" type="submit">Confirmer</button><button type="button" class="ghost" data-act="nodon">Annuler</button></form>` : ""}
       ${state.missingFor === c.id ? `<form class="inline-form" data-missing="${c.id}"><input id="miss-note" placeholder="Remarque pour le magasin (ex. rupture fournisseur, retour prévu…) : la commande repart à commander"><button class="s-manquant" type="submit">Confirmer : produit manquant</button><button type="button" class="ghost" data-act="nomissing">Annuler</button></form>` : ""}
     </div>`;
   }
@@ -677,6 +738,7 @@ ${extraArtsHtml()}
     if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
     if (e.target.id === "f-ref") autofillFromRef(e.target);
     if (e.target.id === "f-cb") autofillFromCb(e.target);
+    if (e.target.id === "x-four") state.xFour = e.target.value;
     if (e.target.dataset && e.target.dataset.xk) { const row = e.target.closest(".xa-row"), i = +row.dataset.xi, k = e.target.dataset.xk; if (state.extraArts[i]) { state.extraArts[i][k] = e.target.value; if (state.extraArts[i].auto) delete state.extraArts[i].auto[k]; if (k === "reference" || k === "codeBarres") autofillExtra(row, i, k); saveExtra(); } }
     if (e.target.id === "f-produit") delete e.target.dataset.auto;
     if (e.target.id === "f-marque") delete e.target.dataset.auto;
@@ -721,6 +783,23 @@ ${extraArtsHtml()}
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
         clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
       }, (docs.length > 1 ? docs.length + " articles envoyés à " : "Commande envoyée à ") + (dest ? nom(dest) : "la centrale"));
+    } else if (f.dataset.don) {
+      // Livraison partielle par la centrale (demande de Marvin 26/11) : la quantité donnée devient une ligne « reçue »,
+      // le reste garde son statut et reste en commande.
+      const c = byId(f.dataset.don); const q = Number(c && c.quantite) || 1; const n = Math.floor(Number(f.querySelector("#don-qte").value));
+      if (!c) return;
+      if (!(n >= 1 && n < q)) { toast(n >= q ? "Pour tout donner, utilisez « Reçue »." : "Indiquez une quantité entre 1 et " + (q - 1) + "."); return; }
+      state.donFor = null;
+      const reste = q - n, now = new Date().toISOString();
+      const { id: _id, ...base } = c;
+      const donne = { ...base, quantite: n, statut: "recue", majLe: now, vuParMagasin: false, clientPrevenu: false, alerteManquant: false, partieDe: c.id,
+        historique: [...(Array.isArray(c.historique) ? c.historique : []), { statut: "recue", le: now }],
+        noteCentrale: "Donné par la centrale : " + n + " sur " + q + ". Reste " + reste + " en commande." };
+      guard(async () => {
+        await state.db.collection("commandes").add(donne);
+        await state.db.collection("commandes").doc(c.id).update({ quantite: reste, majLe: now, vuParMagasin: false,
+          noteCentrale: n + " sur " + q + " déjà donné(s) par la centrale : reste " + reste + " en commande." });
+      }, n + " donné(s) à " + nom(c.magasin) + ", " + reste + " reste(nt) en commande");
     } else if (f.dataset.missing) {
       const c = byId(f.dataset.missing); const note = norm(f.querySelector("#miss-note").value);
       state.missingFor = null;
@@ -770,6 +849,7 @@ ${extraArtsHtml()}
       case "filter": state.magFilter = b.dataset.v; render(); break;
       case "cfilter": state.cFilter = b.dataset.v; state.selected.clear(); render(); break;
       case "group": state.cGroup = b.dataset.v; render(); break;
+      case "export": { const sel = $("#x-four"); if (sel) state.xFour = sel.value; const v = b.dataset.v; b.disabled = true; (v === "pdf" ? exporterPdf() : exporterExcel()).then(() => toast(v === "pdf" ? "PDF téléchargé" : "Fichier Excel téléchargé")).catch((e) => { console.error(e); toast("Export impossible : vérifiez la connexion et réessayez."); }).finally(() => { b.disabled = false; }); break; }
       case "seen": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ vuParMagasin: true })); break;
       case "seenall": guard(async () => { for (const x of state.commandes.filter((x) => x.magasin === state.route && x.vuParMagasin === false)) await state.db.collection("commandes").doc(x.id).update({ vuParMagasin: true }); }); break;
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
@@ -787,6 +867,8 @@ ${extraArtsHtml()}
       case "st": if (c) { const own = c.magasin === state.route; guard(() => changeStatus(c, b.dataset.v, { ...(b.dataset.v === "recue" && !c.fournisseurMagasin ? { noteCentrale: "" } : {}), ...(own ? { vuParMagasin: true } : {}) }), own ? "Statut mis à jour" : b.dataset.v === "commandee" ? "Marquée commandée : le magasin est prévenu" : "Marquée reçue : le magasin est prévenu"); } break;
       case "askmissing": state.missingFor = id; render(); setTimeout(() => $("#miss-note")?.focus(), 0); break;
       case "nomissing": state.missingFor = null; render(); break;
+      case "askdon": state.donFor = id; state.missingFor = null; render(); setTimeout(() => { const i = $("#don-qte"); if (i) { i.focus(); i.select(); } }, 0); break;
+      case "nodon": state.donFor = null; render(); break;
       case "revert": if (c) guard(() => revert(c), "Statut précédent rétabli"); break;
       case "bulk": {
         const k = b.dataset.k;
@@ -801,7 +883,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261124165825";
+  const VERSION = "20261126115255";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
