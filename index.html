@@ -101,6 +101,10 @@ form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form
 .tabs button.on { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .tabs .n { font-variant-numeric: tabular-nums; margin-left: 4px; opacity: .75; }
 .cards { display: grid; gap: 10px; }
+.des-results { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px; }
+.des-results button { text-align: left; display: grid; gap: 2px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; font-weight: 500; }
+.des-results button:hover, .des-results button:focus { background: var(--surface-2); }
+.des-results small { color: var(--muted); font-family: var(--f-mono); font-size: .78rem; }
 .client-grp { border: 2px solid var(--line); border-radius: var(--r); background: var(--surface-2); padding: 10px; display: grid; gap: 8px; }
 .client-grp > .ch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 2px 4px; }
 .client-grp > .ch .nm { font-weight: 700; font-size: 1.05rem; }
@@ -170,7 +174,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126162209"></script>
+<script src="config.js?v=20261126200752"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -189,7 +193,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), donFor: null, missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, xFour: "", demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), mSearch: "", donFor: null, missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, xFour: "", demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -404,7 +408,8 @@ details summary { cursor: pointer; font-weight: 600; }
       toutes: { l: "Toutes", f: () => true },
     };
     const f = filters[state.magFilter] || filters.actives;
-    const list = mine.filter(f.f);
+    const mq = sansAccent(state.mSearch);
+    const list = mine.filter(f.f).filter((c) => !mq || mq.split(" ").every((w) => sansAccent([clientNom(c), c.telephone, c.produit, c.reference, c.codeBarres, c.marque, c.vendeur].join(" ")).includes(w)));
 
     let alerts = "";
     if (missing.length) alerts += `<div class="alert bad"><div class="txt"><b>${missing.length} produit${missing.length > 1 ? "s" : ""} manquant${missing.length > 1 ? "s" : ""} à la réception.</b> Prévenez ${missing.length > 1 ? "les clients" : "le client"} : ${missing.map((c) => esc(clientNom(c)) + " (" + esc(c.produit) + ")").join(", ")}.</div><button class="s-manquant" data-act="filter" data-v="manquant">Voir</button></div>`;
@@ -436,6 +441,7 @@ details summary { cursor: pointer; font-weight: 600; }
           <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
           <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
           <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Remplie par le code-barres" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
+          <div class="f c6" style="position:relative"><label class="label" for="f-des-search">Pas de code-barres ? Rechercher par désignation</label><input id="f-des-search" type="search" placeholder="Ex. : inoa 7.1, majirel 4.15, cire hairgum…" autocomplete="off"><div id="des-results" class="des-results" hidden></div></div>
           <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Scannez ou tapez le code-barres" autocomplete="off"><span id="cb-hint" class="muted" style="font-size:.8rem"></span></div>
           <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
           <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
@@ -449,9 +455,10 @@ ${extraArtsHtml()}
       </section>`}
       <section style="display:grid;gap:12px">
         <div class="row spread"><h2>Mes commandes</h2>
+          <div style="flex:1 1 220px;max-width:320px"><input id="m-search" type="search" placeholder="Chercher désignation, client, réf…" value="${esc(state.mSearch)}" aria-label="Chercher dans mes commandes"></div>
           <div class="tabs" role="tablist">${Object.entries(filters).map(([k, v]) => `<button role="tab" aria-selected="${state.magFilter === k}" class="${state.magFilter === k ? "on" : ""}" data-act="filter" data-v="${k}">${v.l}<span class="n">${mine.filter(v.f).length}</span></button>`).join("")}</div>
         </div>
-        ${list.length ? `<div class="cards">${parClient(list).map((g) => g.length === 1 ? storeCard(g[0], ro) : clientGroupe(g, ro)).join("")}</div>` : `<div class="empty"><h3>${mine.length ? "Aucune commande dans cette liste" : "Aucune commande pour l'instant"}</h3><p>${mine.length ? "Changez de filtre pour voir les autres." : "Saisissez la première commande client avec le formulaire ci-dessus."}</p></div>`}
+        ${list.length ? `<div class="cards">${parClient(list).map((g) => g.length === 1 ? storeCard(g[0], ro) : clientGroupe(g, ro)).join("")}</div>` : `<div class="empty"><h3>${state.mSearch ? "Aucune commande ne correspond à « " + esc(state.mSearch) + " »" : mine.length ? "Aucune commande dans cette liste" : "Aucune commande pour l'instant"}</h3><p>${mine.length ? "Changez de filtre pour voir les autres." : "Saisissez la première commande client avec le formulaire ci-dessus."}</p></div>`}
       </section>
       ${ro ? "" : vendeursBlock(m)}`;
   }
@@ -527,7 +534,7 @@ ${extraArtsHtml()}
           <div class="tabs"><button class="${state.cFilter === "toutes" ? "on" : ""}" data-act="cfilter" data-v="toutes">Tous statuts<span class="n">${all.length}</span></button></div>
         </div>
         <div class="row" style="gap:6px"><select id="x-four" aria-label="Fournisseur à exporter" style="max-width:240px"><option value="">Tous les fournisseurs (${list.length})</option>${xBrands.map((k) => `<option value="${esc(k)}" ${state.xFour === k ? "selected" : ""}>${esc(k)} (${list.filter((c) => (brandKey(c.marque) || "(SANS MARQUE)") === k).length})</option>`).join("")}</select><button data-act="export" data-v="xlsx" ${list.length ? "" : "disabled"} title="Exporter la liste affichée en Excel">⬇ Excel</button><button data-act="export" data-v="pdf" ${list.length ? "" : "disabled"} title="Exporter la liste affichée en PDF">⬇ PDF</button></div>
-        <div style="flex:1 1 220px;max-width:320px"><input id="c-search" type="search" placeholder="Chercher client, produit, réf…" value="${esc(state.cSearch)}" aria-label="Chercher"></div>
+        <div style="flex:1 1 220px;max-width:320px"><input id="c-search" type="search" placeholder="Chercher client, désignation, réf…" value="${esc(state.cSearch)}" aria-label="Chercher"></div>
       </div>
       ${keys.length ? keys.map((k) => groupBlock(k, groups.get(k), ro)).join("") : `<div class="empty"><h3>${all.length ? "Rien dans cette vue" : "Aucune commande reçue pour l'instant"}</h3><p>${all.length ? "Changez de statut ou de recherche." : "Les commandes saisies par les magasins apparaîtront ici, classées par marque."}</p></div>`}
       ${ro || lecture ? "" : settingsBlock()}`;
@@ -683,12 +690,14 @@ ${extraArtsHtml()}
   const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
   const cbKey = (v) => norm(v).replace(/\s+/g, "");
   // Catalogue des tarifs fournisseurs (catalogue.json, importé des mails de Marvin le 24/11) : référence, code-barres, désignation, fournisseur.
-  const CAT = { ref: {}, cb: {}, n: 0 };
+  const CAT = { ref: {}, cb: {}, n: 0, all: [] };
+  const sansAccent = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   setTimeout(() => fetch("catalogue.json?v=" + (typeof VERSION !== "undefined" ? VERSION : "1")).then((r) => (r.ok ? r.json() : [])).then((rows) => {
     for (const [reference, codeBarres, designation, marque] of rows) {
       const a = { reference, codeBarres, designation, marque, catalogue: true };
       const k = refKey(reference); if (k && !CAT.ref[k]) CAT.ref[k] = a;
       const c = cbKey(codeBarres); if (c && !CAT.cb[c]) CAT.cb[c] = a;
+      a.s = sansAccent([designation, reference, marque].join(" ")); CAT.all.push(a);
     }
     CAT.n = rows.length;
   }).catch(() => {}), 0);
@@ -699,6 +708,34 @@ ${extraArtsHtml()}
     for (const k of ["reference", "produit", "marque"]) { const el = f.elements[k]; if (!el) continue; const lock = !state.manuel; if (el.tagName === "SELECT") el.disabled = lock; else el.readOnly = lock; el.classList.toggle("locked", lock); el.title = lock ? "Rempli automatiquement par le code-barres" : ""; }
     const ma = f.elements.marqueAutre; if (ma) ma.readOnly = !state.manuel;
     const h = $("#cb-hint"); if (h && !h.textContent) h.innerHTML = state.manuel ? "Saisie à la main activée." : "La référence, la désignation et le fournisseur se remplissent avec le code-barres.";
+  }
+  // Recherche par désignation dans le catalogue et les articles mémorisés (demande de Marvin 26/11).
+  let desTrouves = [];
+  function chercherDesignation(v) {
+    const box = $("#des-results"); if (!box) return;
+    const mots = sansAccent(v).split(" ").filter(Boolean);
+    if (!mots.length || sansAccent(v).length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+    const memo = Object.values(state.articles).map((a) => ({ ...a, s: sansAccent([a.designation, a.reference, a.marque].join(" ")) }));
+    const vus = new Set(); desTrouves = [];
+    for (const a of [...memo, ...CAT.all]) {
+      if (!mots.every((w) => a.s.includes(w))) continue;
+      const k = cbKey(a.codeBarres) || refKey(a.reference) || a.s; if (vus.has(k)) continue; vus.add(k);
+      desTrouves.push(a); if (desTrouves.length >= 30) break;
+    }
+    box.hidden = false;
+    box.innerHTML = desTrouves.length ? desTrouves.map((a, i) => `<button type="button" data-act="pickart" data-v="${i}"><span>${esc(a.designation || "")}</span><small>${esc(a.marque || "")}${a.reference ? " · réf. " + esc(a.reference) : ""}${a.codeBarres ? " · ▥ " + esc(a.codeBarres) : ""}</small></button>`).join("") + (desTrouves.length >= 30 ? `<div class="muted" style="padding:6px 10px;font-size:.8rem">Affinez la recherche pour voir d'autres articles.</div>` : "")
+      : `<div class="muted" style="padding:8px 10px">Aucun article trouvé. Vérifiez l'orthographe, ou utilisez le code-barres.</div>`;
+  }
+  function choisirArticle(a) {
+    const f = $("#newform"); if (!f || !a) return;
+    const cb = f.elements.codeBarres, ref = f.elements.reference;
+    if (!state.manuel) { for (const k of ["reference", "produit"]) { f.elements[k].value = ""; f.elements[k].dataset.auto = "1"; } f.elements.marque.value = ""; f.elements.marque.dataset.auto = "1"; }
+    cb.value = a.codeBarres || ""; cb.dataset.auto = "1"; ref.value = a.reference || ""; ref.dataset.auto = "1";
+    autofillFromRef(ref, a);
+    const ch = $("#cb-hint"); if (ch) ch.textContent = "Article trouvé : " + (a.designation || "");
+    const s = $("#f-des-search"), box = $("#des-results"); if (s) s.value = ""; if (box) { box.hidden = true; box.innerHTML = ""; }
+    if (typeof saveDraft === "function") saveDraft();
+    $("#f-qte")?.focus();
   }
   function autofillFromCb(input) {
     const v = cbKey(input.value); const hint = $("#ref-hint"); const ch = $("#cb-hint");
@@ -738,6 +775,10 @@ ${extraArtsHtml()}
 
   // ---------- Events ----------
   const byId = (id) => pool().find((c) => c.id === id);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.id === "f-des-search" && e.key === "Enter") { e.preventDefault(); if (desTrouves.length === 1 || (desTrouves.length && !$("#des-results")?.hidden)) $("#des-results button")?.focus(); }
+    if (e.target.id === "f-des-search" && e.key === "Escape") { const box = $("#des-results"); if (box) box.hidden = true; }
+  });
   document.addEventListener("input", (e) => {
     if (e.target.id === "v-new") state.vNew = e.target.value;
     if (e.target.closest("#editform") && e.target.name) state.editDraft[e.target.name] = e.target.value;
@@ -749,6 +790,8 @@ ${extraArtsHtml()}
     if (e.target.id === "f-marque") delete e.target.dataset.auto;
     if (e.target.closest("#newform")) { syncAutre(); saveDraft(); }
     if (e.target.id === "c-search") { state.cSearch = e.target.value; render(); }
+    if (e.target.id === "m-search") { state.mSearch = e.target.value; render(); }
+    if (e.target.id === "f-des-search") chercherDesignation(e.target.value);
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
@@ -859,6 +902,7 @@ ${extraArtsHtml()}
       case "seenall": guard(async () => { for (const x of state.commandes.filter((x) => x.magasin === state.route && x.vuParMagasin === false)) await state.db.collection("commandes").doc(x.id).update({ vuParMagasin: true }); }); break;
       case "prevenuclient": { const ids = String(b.dataset.ids || "").split(",").filter(Boolean); guard(async () => { for (const x of ids) await state.db.collection("commandes").doc(x).update({ clientPrevenu: true, vuParMagasin: true }); }, "Noté : client prévenu"); break; }
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
+      case "pickart": choisirArticle(desTrouves[+b.dataset.v]); break;
       case "manuel": state.manuel = true; { const ch = $("#cb-hint"); if (ch) ch.textContent = ""; } appliquerVerrou(); $("#f-ref")?.focus(); break;
       case "xmanuel": saveDraft(); if (state.extraArts[+b.dataset.v]) state.extraArts[+b.dataset.v].manuel = true; saveExtra(); render(); break;
       case "addart": saveDraft(); state.extraArts.push({ quantite: 1 }); saveExtra(); render(); setTimeout(() => { const r = document.querySelectorAll(".xa-row"); r[r.length - 1]?.querySelector("input")?.focus(); }, 0); break;
@@ -889,7 +933,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126162209";
+  const VERSION = "20261126200752";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
