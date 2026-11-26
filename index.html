@@ -34,24 +34,8 @@
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --r: 10px;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #11171d; --surface: #19222b; --surface-2: #222d38; --fg: #e6ecf1; --muted: #95a3b1; --line: #2e3a46;
-  --accent: #6fb2e3; --accent-fg: #0d1a24;
-  --s-envoyee: #8fb5f5; --s-envoyee-bg: #1c2b45;
-  --s-commandee: #f0b85a; --s-commandee-bg: #3a2b12;
-  --s-recue: #6fd39a; --s-recue-bg: #15342a;
-  --s-manquant: #ff8a82; --s-manquant-bg: #431c1b;
-  color-scheme: dark;
-} }
-:root[data-theme="dark"] {
-  --bg: #11171d; --surface: #19222b; --surface-2: #222d38; --fg: #e6ecf1; --muted: #95a3b1; --line: #2e3a46;
-  --accent: #6fb2e3; --accent-fg: #0d1a24;
-  --s-envoyee: #8fb5f5; --s-envoyee-bg: #1c2b45;
-  --s-commandee: #f0b85a; --s-commandee-bg: #3a2b12;
-  --s-recue: #6fd39a; --s-recue-bg: #15342a;
-  --s-manquant: #ff8a82; --s-manquant-bg: #431c1b;
-  color-scheme: dark;
-}
+/* Fond clair imposé (demande de Marvin 26/11), même si l'appareil est en mode sombre. */
+:root { color-scheme: light; }
 * { box-sizing: border-box; }
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; }
@@ -186,7 +170,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126161522"></script>
+<script src="config.js?v=20261126162209"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -905,7 +889,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126161522";
+  const VERSION = "20261126162209";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
