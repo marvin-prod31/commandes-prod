@@ -198,7 +198,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126201542"></script>
+<script src="config.js?v=20261126202013"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -741,8 +741,10 @@ details summary { cursor: pointer; font-weight: 600; }
     box.innerHTML = artTrouves.length ? artTrouves.map((a, i) => `<button type="button" data-act="pickart2" data-v="${i}"><span>${esc(a.designation || "")}</span><small>${esc(a.marque || "")}${a.reference ? " · réf. " + esc(a.reference) : ""}${a.codeBarres ? " · ▥ " + esc(a.codeBarres) : ""}</small></button>`).join("") + (artTrouves.length >= 30 ? `<div class="muted" style="padding:6px 10px;font-size:.8rem">Affinez la recherche pour voir d'autres articles.</div>` : "")
       : `<div class="muted" style="padding:8px 10px">Aucun article trouvé. <button type="button" class="ghost" data-act="manuelart" style="padding:2px 8px">Saisir à la main</button></div>`;
   }
-  function saveExtra() { try { localStorage.setItem("cmd-extra-" + state.route, JSON.stringify(state.extraArts)); } catch {} }
-  function loadExtra() { try { const v = JSON.parse(localStorage.getItem("cmd-extra-" + state.route) || "[]"); state.extraArts = Array.isArray(v) ? v : []; } catch { state.extraArts = []; } }
+  // Panier enregistré sous une nouvelle clé (26/11) : l'ancienne « cmd-extra- » pouvait contenir une ligne vide de l'ancien formulaire.
+  const articleValide = (x) => x && norm(x.produit) && norm(x.marque);
+  function saveExtra() { state.extraArts = state.extraArts.filter(articleValide); try { localStorage.setItem("cmd-panier-" + state.route, JSON.stringify(state.extraArts)); } catch {} }
+  function loadExtra() { try { localStorage.removeItem("cmd-extra-" + state.route); } catch {} try { const v = JSON.parse(localStorage.getItem("cmd-panier-" + state.route) || "[]"); state.extraArts = Array.isArray(v) ? v.filter(articleValide) : []; } catch { state.extraArts = []; } }
   function chercheArticle(ref, cb) {
     const k = refKey(ref || ""), c = cbKey(cb || "");
     if (k && (state.articles[k] || CAT.ref[k])) return state.articles[k] || CAT.ref[k];
@@ -1023,7 +1025,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126201542";
+  const VERSION = "20261126202013";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
