@@ -81,7 +81,7 @@ form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form
 .mtag { font-weight: 700; }
 .xa-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,2fr) 70px auto; gap: 8px; align-items: end; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
 @media (max-width: 720px) { .xa-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { form.new { grid-template-columns: repeat(2, minmax(0, 1fr)); } form.new .c2, form.new .c3, form.new .c4, form.new .c5, form.new .c6 { grid-column: span 2; } form.new .c1 { grid-column: span 1; } }
+@media (max-width: 720px) { .zone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ma-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pa-line { grid-template-columns: 24px minmax(0, 1fr) auto; } .pa-line .pa-q { grid-column: 2; } form.new { grid-template-columns: repeat(2, minmax(0, 1fr)); } form.new .c2, form.new .c3, form.new .c4, form.new .c5, form.new .c6 { grid-column: span 2; } form.new .c1 { grid-column: span 1; } }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .p-demande { color: var(--accent); background: var(--surface-2); }
@@ -101,6 +101,30 @@ form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form
 .tabs button.on { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .tabs .n { font-variant-numeric: tabular-nums; margin-left: 4px; opacity: .75; }
 .cards { display: grid; gap: 10px; }
+/* Formulaire en 3 zones (demande de Marvin 26/11) : client en haut, recherche au milieu, récapitulatif en bas. */
+.zone { border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; margin: 0; display: grid; gap: 12px; min-width: 0; background: var(--surface); }
+.zone legend { display: flex; align-items: center; gap: 8px; padding: 0 6px; font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; }
+.zone .zn { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .85rem; }
+.zone-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.zone-grid .f { align-content: start; }
+.zone input.big { font-size: 1.15rem; font-weight: 600; letter-spacing: .02em; }
+.zone-search { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.search-big { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 2px solid var(--accent); border-radius: 12px; padding: 4px 6px 4px 14px; }
+.search-big span { font-size: 1.3rem; }
+.search-big input { flex: 1; border: 0; background: transparent; font-size: 1.2rem; padding: 12px 4px; min-width: 0; }
+.search-big input:focus { outline: none; box-shadow: none; }
+.search-big:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.pa-list { display: grid; gap: 6px; }
+.pa-line { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.pa-line .n { font-family: var(--f-display); font-weight: 700; color: var(--muted); text-align: center; }
+.pa-line .d { font-weight: 600; }
+.pa-line small { display: block; color: var(--muted); font-family: var(--f-mono); font-size: .78rem; margin-top: 2px; }
+.pa-q { display: flex; align-items: center; gap: 4px; }
+.pa-q button { width: 36px; height: 36px; padding: 0; font-size: 1.1rem; }
+.pa-q input { width: 54px; text-align: center; font-weight: 700; padding: 6px; }
+@media (max-width: 720px) { .zone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ma-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pa-line { grid-template-columns: 24px minmax(0, 1fr) auto; } .pa-line .pa-q { grid-column: 2; } }
+.pa-empty { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); }
+.ma-grid { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,2.4fr) minmax(0,1.5fr) 70px auto; gap: 8px; align-items: end; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--surface); }
 .des-results { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px; }
 .des-results button { text-align: left; display: grid; gap: 2px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; font-weight: 500; }
 .des-results button:hover, .des-results button:focus { background: var(--surface-2); }
@@ -174,7 +198,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126200752"></script>
+<script src="config.js?v=20261126201542"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -193,7 +217,7 @@ details summary { cursor: pointer; font-weight: 600; }
     db: null, readonly: false, loaded: false, failed: "",
     commandes: [], noms: { ...DEFAULT_NOMS },
     route: "", magFilter: "actives", cFilter: "envoyee", cGroup: "marque", cSearch: "",
-    selected: new Set(), mSearch: "", donFor: null, missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, xFour: "", demandes: [], aEnvoyer: [], vueTous: false, articles: {},
+    selected: new Set(), mSearch: "", artQ: "", manuelArt: false, ma: {}, donFor: null, missingFor: null, confirmDel: null, busy: false, settingsOpen: false, vendeurs: {}, vNew: "", editId: null, editDraft: {}, extraArts: [], manuel: false, xFour: "", demandes: [], aEnvoyer: [], vueTous: false, articles: {},
   };
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -435,22 +459,29 @@ details summary { cursor: pointer; font-weight: 600; }
       <section class="panel" style="display:grid;gap:12px">
         <h2>Nouvelle commande client</h2>
         <form class="new" id="newform" autocomplete="off">
-          <div class="f c2"><label class="label" for="f-client">Nom du client</label><input id="f-client" name="client" placeholder="Nom du client"></div>
-          <div class="f c2"><label class="label" for="f-prenom">Prénom du client</label><input id="f-prenom" name="prenom" placeholder="Prénom"></div>
-          <div class="f c2"><label class="label" for="f-tel">Téléphone du client *</label><input id="f-tel" name="telephone" type="tel" inputmode="tel" required placeholder="06 12 34 56 78"></div>
-          <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société"></div>
-          <div class="f c2"><label class="label" for="f-date">Date de commande *</label><input id="f-date" name="dateCommande" type="date" required value="${today()}"></div>
-          <div class="f c2"><label class="label" for="f-ref">Référence fournisseur</label><input id="f-ref" name="reference" placeholder="Remplie par le code-barres" list="dl-refs" autocomplete="off"><datalist id="dl-refs">${Object.values(state.articles).map((a) => `<option value="${esc(a.reference)}">${esc(a.designation)}</option>`).join("")}</datalist><span id="ref-hint" class="muted" style="font-size:.8rem"></span></div>
-          <div class="f c6" style="position:relative"><label class="label" for="f-des-search">Pas de code-barres ? Rechercher par désignation</label><input id="f-des-search" type="search" placeholder="Ex. : inoa 7.1, majirel 4.15, cire hairgum…" autocomplete="off"><div id="des-results" class="des-results" hidden></div></div>
-          <div class="f c2"><label class="label" for="f-cb">Code-barres</label><input id="f-cb" name="codeBarres" inputmode="numeric" placeholder="Scannez ou tapez le code-barres" autocomplete="off"><span id="cb-hint" class="muted" style="font-size:.8rem"></span></div>
-          <div class="f c2"><label class="label" for="f-marque">Marque / fournisseur *</label><select id="f-marque" name="marque" required><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}">${esc(f.nom)}${f.code ? ` (${esc(f.code)})` : " (magasin)"}</option>`).join("")}<option value="__autre">Autre (pas dans la liste)…</option></select><input id="f-marque-autre" name="marqueAutre" placeholder="Nom de la marque" hidden></div>
-          <div class="f c3"><label class="label" for="f-produit">Désignation *</label><input id="f-produit" name="produit" required placeholder="Désignation du produit (teinte, taille…)"></div>
-          <div class="f c1"><label class="label" for="f-qte">Quantité</label><input id="f-qte" name="quantite" type="number" min="1" value="1"></div>
-          <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
-          <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
-${extraArtsHtml()}
-          <div class="f c2"><label class="label" for="f-dest">Envoyer à *</label><select id="f-dest" name="destinataire"><option value="">La centrale</option>${autres(m).map((x) => `<option value="${x}">${esc(nom(x))}</option>`).join("")}</select></div>
-          <div class="c6 row"><button class="primary" type="submit" ${state.busy || !state.db ? "disabled" : ""}>Envoyer la commande</button></div>
+          <fieldset class="zone c6"><legend><span class="zn">1</span>Client</legend>
+            <div class="zone-grid">
+              <div class="f c2"><label class="label" for="f-client">Nom</label><input id="f-client" name="client" placeholder="Nom du client" autocapitalize="words"></div>
+              <div class="f c2"><label class="label" for="f-prenom">Prénom</label><input id="f-prenom" name="prenom" placeholder="Prénom" autocapitalize="words"></div>
+              <div class="f c2"><label class="label" for="f-pro">Professionnel</label><input id="f-pro" name="professionnel" placeholder="Salon / société (facultatif)"></div>
+              <div class="f c2"><label class="label" for="f-tel">📞 Téléphone *</label><input id="f-tel" class="big" name="telephone" type="tel" inputmode="tel" required placeholder="06 12 34 56 78"></div>
+              <div class="f c2"><label class="label" for="f-date">📅 Date de commande *</label><input id="f-date" class="big" name="dateCommande" type="date" required value="${today()}"></div>
+              <div class="f c2"><label class="label" for="f-vendeur">Vendeur *</label><select id="f-vendeur" name="vendeur" required><option value="">Choisir…</option>${vendeursDe(m).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}<option value="__autre" ${vendeursDe(m).length ? "" : "selected"}>Nouveau vendeur…</option></select><input id="f-vendeur-autre" name="vendeurAutre" placeholder="Prénom du nouveau vendeur" hidden></div>
+            </div>
+          </fieldset>
+          <fieldset class="zone zone-search c6"><legend><span class="zn">2</span>Ajouter un article</legend>
+            <div class="search-big"><span aria-hidden="true">🔍</span><input id="f-art" type="search" enterkeyhint="search" placeholder="Scannez le code-barres, ou tapez une désignation ou une référence" value="${esc(state.artQ)}" autocomplete="off" aria-label="Rechercher un article"></div>
+            <div id="art-results" class="des-results" hidden></div>
+            ${state.manuelArt ? manuelArtHtml() : `<div class="muted" style="font-size:.85rem">Touchez un article de la liste pour l'ajouter à la commande. <button type="button" class="ghost" data-act="manuelart" style="padding:2px 8px">Article introuvable ? Saisir à la main</button></div>`}
+          </fieldset>
+          <fieldset class="zone c6"><legend><span class="zn">3</span>Articles de la commande <span class="count">${state.extraArts.length}</span></legend>
+            ${panierHtml()}
+            <div class="zone-grid">
+              <div class="f c4"><label class="label" for="f-note">Remarque</label><textarea id="f-note" name="note" rows="1" placeholder="Acompte versé, délai souhaité…"></textarea></div>
+              <div class="f c2"><label class="label" for="f-dest">Envoyer à *</label><select id="f-dest" name="destinataire"><option value="">La centrale</option>${autres(m).map((x) => `<option value="${x}">${esc(nom(x))}</option>`).join("")}</select></div>
+            </div>
+            <div class="row"><button class="primary" type="submit" ${state.busy || !state.db || !state.extraArts.length ? "disabled" : ""}>Envoyer la commande${state.extraArts.length ? ` (${state.extraArts.reduce((t, x) => t + (parseInt(x.quantite, 10) || 1), 0)} article${state.extraArts.reduce((t, x) => t + (parseInt(x.quantite, 10) || 1), 0) > 1 ? "s" : ""})` : ""}</button></div>
+          </fieldset>
         </form>
       </section>`}
       <section style="display:grid;gap:12px">
@@ -663,6 +694,53 @@ ${extraArtsHtml()}
     return `${state.extraArts.length ? `<div class="c6 muted" style="font-size:.85rem">Autres articles pour ce client (article 1 = celui du dessus) :</div>${rows}` : ""}
           <div class="c6"><button type="button" data-act="addart">+ Ajouter un article</button></div>`;
   }
+  // ----- Panier : les articles de la commande en cours (zone 3), ajoutés depuis la recherche (zone 2) -----
+  function panierHtml() {
+    if (!state.extraArts.length) return `<div class="pa-empty">Aucun article pour l'instant. Scannez ou cherchez un article au-dessus.</div>`;
+    return `<div class="pa-list">${state.extraArts.map((x, i) => `<div class="pa-line"><span class="n">${i + 1}</span>
+      <div style="min-width:0"><span class="d">${esc(x.produit || "")}</span><small>${esc(x.marque || "")}${x.reference ? " · réf. " + esc(x.reference) : ""}${x.codeBarres ? " · ▥ " + esc(x.codeBarres) : ""}</small></div>
+      <div class="pa-q"><button type="button" class="ghost" data-act="paqte" data-v="${i}" data-d="-1" aria-label="Moins">−</button><input data-pq="${i}" type="number" min="1" inputmode="numeric" value="${esc(x.quantite || 1)}" aria-label="Quantité"><button type="button" class="ghost" data-act="paqte" data-v="${i}" data-d="1" aria-label="Plus">+</button></div>
+      <button type="button" class="ghost" data-act="delart" data-v="${i}" title="Retirer cet article" aria-label="Retirer">✕</button></div>`).join("")}</div>`;
+  }
+  function manuelArtHtml() {
+    const v = state.ma || {};
+    return `<div class="ma-grid">
+      <div class="f"><label class="label" for="ma-cb">Code-barres</label><input id="ma-cb" inputmode="numeric" value="${esc(v.codeBarres || "")}"></div>
+      <div class="f"><label class="label" for="ma-ref">Réf. fournisseur</label><input id="ma-ref" value="${esc(v.reference || "")}"></div>
+      <div class="f"><label class="label" for="ma-des">Désignation *</label><input id="ma-des" value="${esc(v.produit || "")}" placeholder="Produit, teinte, taille…"></div>
+      <div class="f"><label class="label" for="ma-marque">Fournisseur *</label><select id="ma-marque"><option value="">Choisir…</option>${FOURNISSEURS.map((f) => `<option value="${esc(f.nom)}" ${v.marque === f.nom ? "selected" : ""}>${esc(f.nom)}</option>`).join("")}</select></div>
+      <div class="f"><label class="label" for="ma-qte">Qté</label><input id="ma-qte" type="number" min="1" value="${esc(v.quantite || 1)}"></div>
+      <div class="row" style="gap:6px"><button type="button" class="primary" data-act="addmanuel">Ajouter</button><button type="button" class="ghost" data-act="nomanuelart">Annuler</button></div>
+    </div>`;
+  }
+  function ajouterArticle(a, q = 1) {
+    if (!a) return;
+    const l = { reference: a.reference || "", codeBarres: a.codeBarres || "", marque: a.marque || "", produit: a.designation || a.produit || "", quantite: q };
+    const k = cbKey(l.codeBarres) || refKey(l.reference);
+    const ex = k && state.extraArts.find((x) => (cbKey(x.codeBarres) || refKey(x.reference)) === k && x.marque === l.marque);
+    if (ex) ex.quantite = (parseInt(ex.quantite, 10) || 1) + q; else state.extraArts.push(l);
+    saveExtra(); state.artQ = ""; artTrouves = [];
+    render(); toast((ex ? "Quantité augmentée : " : "Ajouté : ") + l.produit);
+    setTimeout(() => $("#f-art")?.focus(), 0);
+  }
+  let artTrouves = [];
+  const trouveParCb = (v) => { const c = cbKey(v); return c.length >= 8 ? (Object.values(state.articles).find((x) => cbKey(x.codeBarres) === c) || CAT.cb[c] || null) : null; };
+  function chercherArticles(v) {
+    const box = $("#art-results"); if (!box) return;
+    const q = sansAccent(v), mots = q.split(" ").filter(Boolean);
+    if (q.length < 2) { box.hidden = true; box.innerHTML = ""; artTrouves = []; return; }
+    const memo = Object.values(state.articles).map((a) => ({ ...a, s: sansAccent([a.designation, a.reference, a.marque, a.codeBarres].join(" ")) }));
+    const vus = new Set(); artTrouves = [];
+    for (const a of [...memo, ...CAT.all]) {
+      const s2 = a.s + " " + (a.codeBarres || "");
+      if (!mots.every((w) => s2.includes(w))) continue;
+      const k = cbKey(a.codeBarres) || refKey(a.reference) || a.s; if (vus.has(k)) continue; vus.add(k);
+      artTrouves.push(a); if (artTrouves.length >= 30) break;
+    }
+    box.hidden = false;
+    box.innerHTML = artTrouves.length ? artTrouves.map((a, i) => `<button type="button" data-act="pickart2" data-v="${i}"><span>${esc(a.designation || "")}</span><small>${esc(a.marque || "")}${a.reference ? " · réf. " + esc(a.reference) : ""}${a.codeBarres ? " · ▥ " + esc(a.codeBarres) : ""}</small></button>`).join("") + (artTrouves.length >= 30 ? `<div class="muted" style="padding:6px 10px;font-size:.8rem">Affinez la recherche pour voir d'autres articles.</div>` : "")
+      : `<div class="muted" style="padding:8px 10px">Aucun article trouvé. <button type="button" class="ghost" data-act="manuelart" style="padding:2px 8px">Saisir à la main</button></div>`;
+  }
   function saveExtra() { try { localStorage.setItem("cmd-extra-" + state.route, JSON.stringify(state.extraArts)); } catch {} }
   function loadExtra() { try { const v = JSON.parse(localStorage.getItem("cmd-extra-" + state.route) || "[]"); state.extraArts = Array.isArray(v) ? v : []; } catch { state.extraArts = []; } }
   function chercheArticle(ref, cb) {
@@ -687,7 +765,7 @@ ${extraArtsHtml()}
       if (!x[k] || x.auto[k]) { x[k] = v; x.auto[k] = 1; const el = row.querySelector(`[data-xk="${k}"]`); if (el) { if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === v)) el.add(new Option(v, v)); el.value = v; } }
     }
   }
-  const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "marque", "marqueAutre", "produit", "reference", "codeBarres", "quantite", "note", "vendeur", "vendeurAutre"];
+  const DRAFT_FIELDS = ["client", "prenom", "professionnel", "telephone", "dateCommande", "note", "vendeur", "vendeurAutre"];
   const cbKey = (v) => norm(v).replace(/\s+/g, "");
   // Catalogue des tarifs fournisseurs (catalogue.json, importé des mails de Marvin le 24/11) : référence, code-barres, désignation, fournisseur.
   const CAT = { ref: {}, cb: {}, n: 0, all: [] };
@@ -776,6 +854,13 @@ ${extraArtsHtml()}
   // ---------- Events ----------
   const byId = (id) => pool().find((c) => c.id === id);
   document.addEventListener("keydown", (e) => {
+    if (e.target.id === "f-art" && e.key === "Enter") {
+      e.preventDefault();
+      const a = trouveParCb(e.target.value);
+      if (a) ajouterArticle(a); else if (artTrouves.length === 1) ajouterArticle(artTrouves[0]); else if (artTrouves.length) $("#art-results button")?.focus();
+      else if (/^\d{8,}$/.test(cbKey(e.target.value))) { state.manuelArt = true; state.ma = { codeBarres: cbKey(e.target.value), quantite: 1 }; state.artQ = ""; render(); setTimeout(() => $("#ma-des")?.focus(), 0); }
+    }
+    if (e.target.id === "f-art" && e.key === "Escape") { const box = $("#art-results"); if (box) box.hidden = true; }
     if (e.target.id === "f-des-search" && e.key === "Enter") { e.preventDefault(); if (desTrouves.length === 1 || (desTrouves.length && !$("#des-results")?.hidden)) $("#des-results button")?.focus(); }
     if (e.target.id === "f-des-search" && e.key === "Escape") { const box = $("#des-results"); if (box) box.hidden = true; }
   });
@@ -792,6 +877,9 @@ ${extraArtsHtml()}
     if (e.target.id === "c-search") { state.cSearch = e.target.value; render(); }
     if (e.target.id === "m-search") { state.mSearch = e.target.value; render(); }
     if (e.target.id === "f-des-search") chercherDesignation(e.target.value);
+    if (e.target.id === "f-art") { state.artQ = e.target.value; const v = cbKey(e.target.value); const a = /^\d{12,14}$/.test(v) ? trouveParCb(v) : null; if (a) ajouterArticle(a); else chercherArticles(e.target.value); }
+    if (e.target.dataset && e.target.dataset.pq != null) { const x = state.extraArts[+e.target.dataset.pq]; if (x) { x.quantite = e.target.value; saveExtra(); } }
+    if (e.target.id && e.target.id.startsWith("ma-")) state.ma = { ...state.ma, [{ "ma-cb": "codeBarres", "ma-ref": "reference", "ma-des": "produit", "ma-marque": "marque", "ma-qte": "quantite" }[e.target.id]]: e.target.value };
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
@@ -803,20 +891,17 @@ ${extraArtsHtml()}
     const f = e.target;
     if (f.id === "newform") {
       const d = {}; DRAFT_FIELDS.forEach((k) => (d[k] = norm(f.elements[k].value)));
-      if (d.marque === "__autre") d.marque = d.marqueAutre.toUpperCase();
       if (d.vendeur === "__autre") d.vendeur = d.vendeurAutre;
       delete d.vendeurAutre;
       const nouveauVendeur = d.vendeur && !vendeursDe(state.route).includes(d.vendeur);
-      delete d.marqueAutre;
-      d.codeFournisseur = FOURN_CODE[d.marque] || "";
       if (!(d.client || d.prenom || d.professionnel)) { toast("Remplissez au moins le nom, le prénom ou le professionnel."); return; }
-      if (!state.manuel && (!d.marque || !d.produit)) { toast("Scannez ou tapez un code-barres connu, ou appuyez sur « Saisir à la main »."); return; }
-      if (!d.vendeur || !d.telephone || !d.dateCommande || !d.marque || !d.produit) { toast("Remplissez tous les champs marqués *."); return; }
+      if (!d.vendeur || !d.telephone || !d.dateCommande) { toast("Remplissez le téléphone, la date et le vendeur."); return; }
       const now = new Date().toISOString();
       const dest = MAGS.includes(f.elements.destinataire && f.elements.destinataire.value) && f.elements.destinataire.value !== state.route ? f.elements.destinataire.value : "";
       const extras = state.extraArts.map((x) => Object.fromEntries(XA_KEYS.map((k) => [k, norm(x[k])]))).filter((x) => x.reference || x.codeBarres || x.produit || x.marque);
-      if (extras.some((x) => !x.marque || !x.produit)) { toast("Chaque article ajouté doit avoir un fournisseur et une désignation."); return; }
-      const lignes = [{ reference: d.reference, codeBarres: d.codeBarres, marque: d.marque, produit: d.produit, quantite: d.quantite }, ...extras];
+      if (!extras.length) { toast("Ajoutez au moins un article à la commande."); $("#f-art")?.focus(); return; }
+      if (extras.some((x) => !x.marque || !x.produit)) { toast("Chaque article doit avoir un fournisseur et une désignation."); return; }
+      const lignes = extras;
       const groupe = lignes.length > 1 ? Math.random().toString(36).slice(2, 10) : "";
       const docs = lignes.map((l, i) => {
         const doc = { ...d, ...l, codeFournisseur: FOURN_CODE[l.marque] || "", quantite: Math.max(1, parseInt(l.quantite, 10) || 1), magasin: state.route, statut: "envoyee", fournisseurMagasin: dest, creeLe: now, majLe: now, vuParMagasin: true, clientPrevenu: false, noteCentrale: "" };
@@ -903,6 +988,11 @@ ${extraArtsHtml()}
       case "prevenuclient": { const ids = String(b.dataset.ids || "").split(",").filter(Boolean); guard(async () => { for (const x of ids) await state.db.collection("commandes").doc(x).update({ clientPrevenu: true, vuParMagasin: true }); }, "Noté : client prévenu"); break; }
       case "prevenu": if (c) guard(() => state.db.collection("commandes").doc(c.id).update({ clientPrevenu: true, vuParMagasin: true }), "Noté : client prévenu"); break;
       case "pickart": choisirArticle(desTrouves[+b.dataset.v]); break;
+      case "pickart2": ajouterArticle(artTrouves[+b.dataset.v]); break;
+      case "paqte": { const x = state.extraArts[+b.dataset.v]; if (x) { x.quantite = Math.max(1, (parseInt(x.quantite, 10) || 1) + (+b.dataset.d)); saveExtra(); render(); } break; }
+      case "manuelart": state.manuelArt = true; state.ma = { ...(state.ma || {}), quantite: (state.ma && state.ma.quantite) || 1, ...(/^\d{8,}$/.test(cbKey(state.artQ)) ? { codeBarres: cbKey(state.artQ) } : state.artQ ? { produit: state.artQ } : {}) }; state.artQ = ""; render(); setTimeout(() => $("#ma-des")?.focus(), 0); break;
+      case "nomanuelart": state.manuelArt = false; state.ma = {}; render(); break;
+      case "addmanuel": { const v = state.ma || {}; if (!norm(v.produit) || !norm(v.marque)) { toast("Indiquez au moins la désignation et le fournisseur."); break; } state.manuelArt = false; state.ma = {}; ajouterArticle({ reference: norm(v.reference), codeBarres: cbKey(v.codeBarres), marque: v.marque, designation: norm(v.produit) }, Math.max(1, parseInt(v.quantite, 10) || 1)); break; }
       case "manuel": state.manuel = true; { const ch = $("#cb-hint"); if (ch) ch.textContent = ""; } appliquerVerrou(); $("#f-ref")?.focus(); break;
       case "xmanuel": saveDraft(); if (state.extraArts[+b.dataset.v]) state.extraArts[+b.dataset.v].manuel = true; saveExtra(); render(); break;
       case "addart": saveDraft(); state.extraArts.push({ quantite: 1 }); saveExtra(); render(); setTimeout(() => { const r = document.querySelectorAll(".xa-row"); r[r.length - 1]?.querySelector("input")?.focus(); }, 0); break;
@@ -933,7 +1023,7 @@ ${extraArtsHtml()}
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126200752";
+  const VERSION = "20261126201542";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
