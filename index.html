@@ -134,6 +134,26 @@ form.new .c2 { grid-column: span 2; } form.new .c3 { grid-column: span 3; } form
 .client-grp > .ch .nm { font-weight: 700; font-size: 1.05rem; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
 .card.unseen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.fiche { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.fiche.unseen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.fiche.bad { border-left: 4px solid var(--s-manquant); }
+.fiche .fh { padding: 14px 16px; display: grid; gap: 8px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.fh-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
+.fh-who .nm { font-family: var(--f-display); font-weight: 800; font-size: 1.2rem; }
+.fh-who .tel { font-weight: 700; font-size: 1.1rem; color: var(--fg); text-decoration: none; letter-spacing: .02em; }
+.fiche .fl { display: grid; }
+.fline { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto auto; gap: 6px 14px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+.fline:first-child { border-top: 0; }
+.fline.unseen { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.fline.bad { background: var(--s-manquant-bg); }
+.fline .q { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; text-align: center; line-height: 1; }
+.fline .q small { font-size: .9rem; color: var(--muted); margin-left: 1px; }
+.fline .pr { min-width: 0; }
+.fline .prod { font-weight: 700; font-size: 1.02rem; }
+.fline .fourn { display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); padding: 2px 8px; border-radius: 4px; vertical-align: 1px; }
+.fline .pr small { display: block; color: var(--muted); font-size: .8rem; margin-top: 3px; }
+.fline .acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+@media (max-width: 720px) { .fline { grid-template-columns: 44px minmax(0, 1fr); } .fline .st, .fline .acts { grid-column: 2; justify-content: flex-start; } }
 .card.bad { border-left: 4px solid var(--s-manquant); }
 .card .head { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; }
 .card .head .grow { flex: 1 1 auto; min-width: 0; }
@@ -198,7 +218,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126202013"></script>
+<script src="config.js?v=20261126202521"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -489,19 +509,52 @@ details summary { cursor: pointer; font-weight: 600; }
           <div style="flex:1 1 220px;max-width:320px"><input id="m-search" type="search" placeholder="Chercher désignation, client, réf…" value="${esc(state.mSearch)}" aria-label="Chercher dans mes commandes"></div>
           <div class="tabs" role="tablist">${Object.entries(filters).map(([k, v]) => `<button role="tab" aria-selected="${state.magFilter === k}" class="${state.magFilter === k ? "on" : ""}" data-act="filter" data-v="${k}">${v.l}<span class="n">${mine.filter(v.f).length}</span></button>`).join("")}</div>
         </div>
-        ${list.length ? `<div class="cards">${parClient(list).map((g) => g.length === 1 ? storeCard(g[0], ro) : clientGroupe(g, ro)).join("")}</div>` : `<div class="empty"><h3>${state.mSearch ? "Aucune commande ne correspond à « " + esc(state.mSearch) + " »" : mine.length ? "Aucune commande dans cette liste" : "Aucune commande pour l'instant"}</h3><p>${mine.length ? "Changez de filtre pour voir les autres." : "Saisissez la première commande client avec le formulaire ci-dessus."}</p></div>`}
+        ${list.length ? `<div class="cards">${parClient(list).map((g) => clientGroupe(g, ro)).join("")}</div>` : `<div class="empty"><h3>${state.mSearch ? "Aucune commande ne correspond à « " + esc(state.mSearch) + " »" : mine.length ? "Aucune commande dans cette liste" : "Aucune commande pour l'instant"}</h3><p>${mine.length ? "Changez de filtre pour voir les autres." : "Saisissez la première commande client avec le formulaire ci-dessus."}</p></div>`}
       </section>
       ${ro ? "" : vendeursBlock(m)}`;
   }
 
+  // Fiche client (demande de Marvin 26/11) : client, téléphone, vendeur et date une seule fois en haut,
+  // puis une ligne par article : quantité, produit et fournisseur en évidence.
   function clientGroupe(g, ro) {
     const c0 = g[g.length - 1], qte = g.reduce((s, c) => s + (Number(c.quantite) || 1), 0);
     const parSt = Object.keys(ST).map((k) => [k, g.filter((c) => c.statut === k).length]).filter(([, n]) => n);
     const aPrevenir = g.filter((c) => (c.statut === "recue" || estManquant(c)) && !c.clientPrevenu);
-    return `<div class="client-grp">
-      <div class="ch"><span class="nm">👤 ${esc(clientNom(c0))}</span>${c0.telephone ? `<span>${esc(c0.telephone)}</span>` : ""}<span class="muted">${g.length} lignes · ${qte} article(s)</span><span class="muted">${parSt.map(([k, n]) => n + " " + esc(ST[k].s.toLowerCase()) + (n > 1 ? "s" : "")).join(" · ")}</span>
-        ${!ro && aPrevenir.length > 1 ? `<button class="s-recue" data-act="prevenuclient" data-ids="${aPrevenir.map((c) => c.id).join(",")}">Client prévenu pour ${aPrevenir.length} articles</button>` : ""}</div>
-      ${g.map((c) => storeCard(c, ro)).join("")}
+    const vendeurs = [...new Set(g.map((c) => c.vendeur).filter(Boolean))];
+    const dates = [...new Set(g.map((c) => (c.dateCommande ? fmtDay(c.dateCommande) : fmt(c.creeLe))))];
+    const notes = [...new Set(g.map((c) => norm(c.note)).filter(Boolean))];
+    const unseen = g.some((c) => c.vuParMagasin === false), bad = g.some((c) => estManquant(c) && !c.clientPrevenu);
+    return `<article class="fiche ${unseen ? "unseen" : ""} ${bad ? "bad" : ""}">
+      <div class="fh">
+        <div class="fh-who"><span class="nm">👤 ${esc(clientNom(c0))}</span>${c0.telephone ? `<a class="tel" href="tel:${esc(String(c0.telephone).replace(/[^\d+]/g, ""))}">📞 ${esc(c0.telephone)}</a>` : ""}</div>
+        <div class="meta">${vendeurs.length ? `<span>Vendeur : ${esc(vendeurs.join(", "))}</span>` : ""}<span>Commande du ${esc(dates.join(", "))}</span><span>${g.length} ligne${g.length > 1 ? "s" : ""} · ${qte} article${qte > 1 ? "s" : ""}</span><span>${parSt.map(([k, n]) => n + " " + esc(ST[k].s.toLowerCase()) + (n > 1 ? "s" : "")).join(" · ")}</span></div>
+        ${notes.length ? `<div class="note">${esc(notes.join(" · "))}</div>` : ""}
+        ${!ro && aPrevenir.length ? `<div><button class="${aPrevenir.some(estManquant) ? "s-manquant" : "s-recue"}" data-act="prevenuclient" data-ids="${aPrevenir.map((c) => c.id).join(",")}">Client prévenu${aPrevenir.length > 1 ? ` (${aPrevenir.length} articles)` : ""}</button></div>` : ""}
+      </div>
+      <div class="fl">${g.map((c) => storeLine(c, ro)).join("")}</div>
+    </article>`;
+  }
+  function storeLine(c, ro) {
+    const unseen = c.vuParMagasin === false, bad = estManquant(c) && !c.clientPrevenu;
+    const acts = [];
+    if (!ro) {
+      if (unseen) acts.push(`<button data-act="seen" data-id="${c.id}">Vu</button>`);
+      if (c.statut === "demande") acts.push(`<button data-act="tocentrale" data-id="${c.id}">Envoyer à la centrale</button>`);
+      if (c.statut === "commandee" && c.fournisseurMagasin) acts.push(`<button class="s-recue" data-act="st" data-v="recue" data-id="${c.id}">Reçu de ${esc(nom(c.fournisseurMagasin))}</button>`);
+      if (c.statut === "envoyee" || c.statut === "demande") {
+        if (state.confirmDel === c.id) acts.push(`<span class="muted" style="font-size:.85rem">Annuler cet article ?</span><button class="s-manquant" data-act="del" data-id="${c.id}">Oui</button><button class="ghost" data-act="nodel">Non</button>`);
+        else acts.push(`<button class="ghost" data-act="askdel" data-id="${c.id}" title="Annuler cet article">Annuler</button>`);
+      }
+      if (state.editId !== c.id) acts.push(`<button class="ghost" data-act="edit" data-id="${c.id}" title="Modifier">✏️</button>`);
+    }
+    return `<div class="fline ${unseen ? "unseen" : ""} ${bad ? "bad" : ""}">
+      <div class="q">${esc(c.quantite || 1)}<small>×</small></div>
+      <div class="pr">${unseen ? `<span class="new-badge">Nouveau</span> ` : ""}<span class="prod">${esc(c.produit)}</span> <span class="fourn">${esc(c.marque)}</span>
+        <small>${c.reference ? "réf. " + esc(c.reference) + " · " : ""}${c.codeBarres ? "▥ " + esc(c.codeBarres) + " · " : ""}N° ${shortId(c.id)}${c.fournisseurMagasin ? " · envoyé à " + esc(nom(c.fournisseurMagasin)) : ""}${c.majLe && c.statut !== "envoyee" ? " · " + esc(ST[c.statut]?.s || "") + " le " + fmt(c.majLe) : ""}${c.clientPrevenu ? " · client prévenu ✓" : ""}</small>
+        ${c.noteCentrale ? `<div class="note central" style="margin-top:4px"><b>${c.fournisseurMagasin ? "Info" : "Centrale"} :</b> ${esc(c.noteCentrale)}</div>` : ""}</div>
+      <div class="st">${pill(c.statut, c)}</div>
+      <div class="acts">${acts.join("")}</div>
+      ${state.editId === c.id ? `<div style="grid-column:1/-1">${editForm(c)}</div>` : ""}
     </div>`;
   }
 
@@ -1025,7 +1078,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126202013";
+  const VERSION = "20261126202521";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
