@@ -220,7 +220,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261126202700"></script>
+<script src="config.js?v=20261127102142"></script>
 <script>
 (() => {
   const MAGS = ["m1", "m2", "m3", "m4"];
@@ -974,12 +974,18 @@ details summary { cursor: pointer; font-weight: 600; }
         doc.historique = [{ statut: doc.statut, le: now }];
         return doc;
       });
+      // Remise à zéro complète (demande de Marvin 27/11) : une fois l'envoi réussi, on vide la mémoire
+      // et le formulaire affiché (l'ancien f.reset() visait un formulaire déjà remplacé par un rafraîchissement).
+      const viderFormulaire = () => {
+        clearDraft(); try { localStorage.removeItem("cmd-vendeur-" + state.route); } catch {}
+        state.extraArts = []; saveExtra(); state.manuel = false; state.artQ = ""; state.manuelArt = false; state.ma = {}; artTrouves = [];
+        const nf = $("#newform"); if (nf) { nf.reset(); const dt = $("#f-date"); if (dt) dt.value = today(); syncAutre(); }
+      };
       guard(async () => {
         for (const doc of docs) await state.db.collection("commandes").add(doc);
         for (const l of lignes) { try { const k = refKey(l.reference); if (k) await state.db.collection("articles").doc(k).set({ reference: l.reference, designation: l.produit, marque: l.marque, ...(l.codeBarres ? { codeBarres: l.codeBarres } : {}), majLe: now }); } catch (e) { console.error(e); } }
-        state.extraArts = []; saveExtra(); state.manuel = false; const ch = $("#cb-hint"); if (ch) ch.textContent = "";
         if (nouveauVendeur) { try { await enregistrerVendeurs(state.route, [...vendeursDe(state.route), d.vendeur]); } catch (e) { console.error(e); } }
-        clearDraft(); try { localStorage.setItem("cmd-vendeur-" + state.route, d.vendeur); } catch {} f.reset(); setTimeout(() => { const fv = $("#f-vendeur"); if (fv) { fv.value = d.vendeur; syncAutre(); } }, 0); syncAutre();
+        viderFormulaire(); setTimeout(() => { viderFormulaire(); window.scrollTo({ top: 0, behavior: "smooth" }); $("#f-client")?.focus(); }, 0);
       }, (docs.length > 1 ? docs.length + " articles envoyés à " : "Commande envoyée à ") + (dest ? nom(dest) : "la centrale"));
     } else if (f.dataset.don) {
       // Livraison partielle par la centrale (demande de Marvin 26/11) : la quantité donnée devient une ligne « reçue »,
@@ -1088,7 +1094,7 @@ details summary { cursor: pointer; font-weight: 600; }
   });
 
   // Mise à jour automatique : si une nouvelle version est en ligne, la page se recharge (contourne le cache de l'iPad).
-  const VERSION = "20261126202700";
+  const VERSION = "20261127102142";
   async function verifierVersion() {
     try {
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
